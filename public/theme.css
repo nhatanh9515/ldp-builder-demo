@@ -1,0 +1,225 @@
+/* ============================================================
+   MB Bank Design System — tokens dùng chung cho LDP Builder
+   (Trích từ "Design system website MB.pdf")
+   ============================================================ */
+@import url('/fonts.css');
+
+:root {
+  /* ----- Màu thương hiệu MB ----- */
+  --mb-navy:        #254464;   /* Primary dark — text/title, nền đậm */
+  --mb-navy-700:    #1b3550;
+  --mb-blue:        #314CE7;   /* Primary action — button, icon, link */
+  --mb-blue-600:    #2840d6;
+  --mb-blue-light:  #A1D1FF;   /* Secondary light blue */
+  --mb-blue-100:    #D6E6FF;
+  --mb-blue-50:     #EAF1FF;
+  --mb-violet:      #5E17EB;   /* Accent / gradient */
+  --mb-cyan:        #70F3FF;   /* Priority */
+  --mb-yellow:      #F5FF70;   /* Private */
+  --mb-ink:         #121212;   /* Label / body text */
+  --mb-ink-soft:    #3a4a5e;
+  --mb-surface:     #E4E2DC;   /* Neutral surface */
+  --mb-white:       #FFFFFF;
+
+  /* Trạng thái */
+  --mb-success:     #16a34a;
+  --mb-warning:     #ca8a04;
+  --mb-error:       #dc2626;
+  --mb-link:        #314CE7;
+
+  /* Gradient & glass */
+  --mb-gradient:        linear-gradient(135deg, #314CE7 0%, #5E17EB 100%);
+  --mb-gradient-soft:   linear-gradient(135deg, #EAF1FF 0%, #F1EAFE 100%);
+  --mb-glass-bg:        rgba(255, 255, 255, 0.72);
+  --mb-glass-border:    rgba(37, 68, 100, 0.10);
+  --mb-glass-blur:      blur(10px);
+
+  /* Typography — font chính Averta */
+  --mb-font: 'Averta', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Type-scale theo Design System MB (dùng cho nội dung trang) */
+  --mb-text-display: 54px;   /* Hero / banner lớn nhất — Semibold */
+  --mb-text-title1:  48px;   /* Tiêu đề trang / section quan trọng */
+  --mb-text-title2:  36px;   /* Tiêu đề section */
+  --mb-text-h3:      30px;
+  --mb-text-h4:      24px;
+  --mb-text-h5:      16px;
+  --mb-text-h6:      14px;
+  --mb-text-body:    16px;   /* Body large */
+  --mb-text-small:   14px;   /* Body small / chú thích */
+
+  /* Hình khối */
+  --mb-radius-sm:   8px;
+  --mb-radius:      12px;
+  --mb-radius-lg:   16px;
+  --mb-radius-pill: 999px;
+  --mb-border:      #E2E8F0;
+  --mb-shadow-sm:   0 1px 3px rgba(37,68,100,.08), 0 0 0 1px rgba(37,68,100,.06);
+  --mb-shadow:      0 10px 30px rgba(37,68,100,.12);
+  --mb-shadow-lg:   0 24px 60px rgba(37,68,100,.20);
+
+  /* ----- Override theme GrapesJS sang tông sáng MB ----- */
+  --gjs-main-font:        var(--mb-font);
+  --gjs-font-color:       var(--mb-ink-soft);
+  --gjs-font-color-active:#ffffff;
+  --gjs-primary-color:    #ffffff;
+  --gjs-secondary-color:  var(--mb-navy);
+  --gjs-tertiary-color:   var(--mb-blue);
+  --gjs-quaternary-color: var(--mb-violet);
+  --gjs-color-highlight:  var(--mb-blue);
+  --gjs-main-color:       #ffffff;
+  --gjs-main-dark-color:  #e8edf3;
+  --gjs-main-light-color: #f5f7fa;
+  --gjs-light-border:     #e2e8f0;
+
+  /* Layout custom: blocks/panel nằm ngoài → canvas chiếm trọn #gjs (không trừ panel trái mặc định).
+     Giữ --gjs-canvas-top mặc định để hệ tọa độ zoom của GrapesJS hoạt động đúng. */
+  --gjs-left-width: 0px;
+}
+
+/* (Để GrapesJS tự căn giữa frame — không ép neo trái nữa để tránh xung đột với
+   cơ chế căn giữa bằng toạ độ của GrapesJS gây lệch.) */
+
+/* ============================================================
+   Tinh chỉnh widget GrapesJS cho dễ đọc trên nền sáng
+   ============================================================ */
+.gjs-editor, .gjs-block, .gjs-sm-sector, .gjs-trt-trait, .gjs-layer { font-family: var(--mb-font); }
+
+/* Block items */
+.gjs-block {
+  background: #ffffff;
+  border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-sm);
+  color: var(--mb-navy);
+  box-shadow: none;
+  min-height: 92px;
+  padding: 14px 8px;
+  transition: border-color .15s, box-shadow .15s, transform .1s;
+}
+.gjs-block:hover {
+  border-color: var(--mb-blue);
+  box-shadow: 0 4px 14px rgba(49,76,231,.15);
+  transform: translateY(-1px);
+}
+/* Icon block cỡ lớn */
+.gjs-block svg { color: var(--mb-blue); width: 38px; height: 38px; margin-bottom: 4px; }
+.gjs-block i   { color: var(--mb-blue); font-size: 32px; }
+.gjs-block-label {
+  color: var(--mb-navy); font-weight: 500; font-size: 12px;
+  font-family: var(--mb-font);
+}
+
+/* Tiêu đề category (Bố cục, Cơ bản...) & sector — cỡ bình thường như tab */
+.gjs-block-category > .gjs-title,
+.gjs-blocks-c > .gjs-title,
+.gjs-block-categories .gjs-title,
+.gjs-sm-sector-title,
+.gjs-trait-category > .gjs-title,
+.gjs-trt-header,
+.gjs-clm-tags-label {
+  color: var(--mb-navy);
+  background: #f5f7fa;
+  font-family: var(--mb-font);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: none;
+  padding: 11px 14px;
+}
+
+/* Style manager: nhãn & input */
+.gjs-sm-label, .gjs-sm-property .gjs-sm-label,
+.gjs-trt-trait__label, .gjs-label { color: var(--mb-ink-soft); }
+.gjs-field {
+  background: #ffffff;
+  border: 1px solid var(--mb-border);
+  border-radius: 6px;
+  color: var(--mb-navy);
+}
+.gjs-field input, .gjs-field select, .gjs-field textarea { color: var(--mb-navy); }
+
+/* Trait "Nội dung" — ô sửa text trong panel Settings */
+.ldp-tc-input {
+  width: 100%; box-sizing: border-box; padding: 9px 11px;
+  border: 1px solid var(--mb-border); border-radius: var(--mb-radius-sm);
+  font: 13px/1.5 var(--mb-font); color: var(--mb-navy); background: #fff;
+  resize: vertical; min-height: 70px;
+}
+.ldp-tc-input:focus { outline: none; border-color: var(--mb-blue); }
+
+/* Layer manager */
+.gjs-layer-title { color: var(--mb-navy); }
+.gjs-layer.gjs-selected > .gjs-layer-item { background: var(--mb-blue-50); }
+
+/* Selector (class) manager */
+.gjs-clm-tag { background: var(--mb-blue-50); color: var(--mb-blue); border-radius: var(--mb-radius-pill); }
+
+/* Thanh kéo & viền canvas */
+.gjs-cv-canvas { background: #eef1f6; }
+
+/* Modal GrapesJS (import code, xem mã) */
+.gjs-mdl-dialog {
+  border-radius: var(--mb-radius-lg);
+  box-shadow: var(--mb-shadow-lg);
+  overflow: hidden;
+}
+.gjs-mdl-header { background: var(--mb-navy); }
+.gjs-mdl-title, .gjs-mdl-header .gjs-mdl-btn-close { color: #ffffff; }
+.gjs-mdl-content { background: #ffffff; }
+
+/* Modal "Sửa mã trang" (HTML/CSS) — rộng hơn để có chỗ cho 2 ô code */
+.gjs-mdl-dialog:has(.ldp-ce) { max-width: 1080px; width: 92%; }
+.ldp-ce { display: flex; flex-direction: column; font-family: var(--mb-font); }
+.ldp-ce-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 12px;
+}
+.ldp-ce-modes {
+  display: inline-flex; border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-pill); overflow: hidden;
+}
+.ldp-ce-mode {
+  padding: 8px 18px; border: none; background: #fff; cursor: pointer;
+  color: var(--mb-navy); font: 600 12px var(--mb-font); transition: background .15s, color .15s;
+}
+.ldp-ce-mode + .ldp-ce-mode { border-left: 1px solid var(--mb-border); }
+.ldp-ce-mode.active { background: var(--mb-blue); color: #fff; }
+.ldp-ce-acts { display: inline-flex; align-items: center; gap: 10px; }
+.ldp-ce-apply, .ldp-ce-zip {
+  padding: 9px 22px; border-radius: var(--mb-radius-pill); cursor: pointer;
+  font: 600 13px var(--mb-font); line-height: 1; transition: filter .15s, background .15s, color .15s, box-shadow .15s;
+}
+.ldp-ce-apply {
+  border: none; background: var(--mb-gradient); color: #fff;
+  box-shadow: 0 6px 16px rgba(49,76,231,.25);
+}
+.ldp-ce-apply:hover { filter: brightness(1.05); }
+.ldp-ce-zip {
+  border: 1.5px solid var(--mb-blue); background: #fff; color: var(--mb-blue);
+}
+.ldp-ce-zip:hover { background: var(--mb-blue-50); }
+.ldp-ce-hint {
+  margin: 0 0 12px; color: var(--mb-ink-soft);
+  font: 13px/1.5 var(--mb-font);
+}
+.ldp-ce-hint b { color: var(--mb-navy); }
+.ldp-ce-split { display: flex; gap: 12px; }
+.ldp-ce-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.ldp-ce-col > span, .ldp-ce-merge > span {
+  font: 600 12px var(--mb-font); color: var(--mb-navy); margin-bottom: 6px;
+}
+.ldp-ce-merge { display: flex; flex-direction: column; }
+.ldp-ce textarea {
+  width: 100%; height: 52vh; box-sizing: border-box; padding: 12px;
+  border: 1px solid var(--mb-border); border-radius: var(--mb-radius-sm);
+  font: 13px/1.55 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color: var(--mb-navy); background: #fbfcfe; resize: vertical; tab-size: 2;
+}
+.ldp-ce textarea:focus { outline: none; border-color: var(--mb-blue); background: #fff; }
+
+/* Toolbar component (move/clone/delete) dùng màu MB */
+.gjs-toolbar { background: var(--mb-navy); border-radius: var(--mb-radius-pill); }
+.gjs-toolbar-item { color: #fff; }
+
+/* Badge tên component khi hover */
+.gjs-badge { background: var(--mb-blue); }

@@ -1,0 +1,15 @@
+node_modules/
+
+# DB runtime (được nạp lại từ seed/ khi khởi động)
+data/
+data.nosync/
+
+# macOS
+.DS_Store
+
+# Bản sao xung đột do Finder/iCloud tạo ("index 2.js", "editor 2.html"...)
+* [0-9].*
+
+# File rỗng lạ ở gốc
+/node
+/ldp-builder@1.0.0

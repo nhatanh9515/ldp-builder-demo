@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LDP Builder</title>
+  <link rel="stylesheet" href="/theme.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #eef1f6;
+      --surface: #ffffff;
+      --border: var(--mb-border);
+      --primary: var(--mb-blue);
+      --primary-hover: var(--mb-blue-600);
+      --danger: var(--mb-error);
+      --danger-hover: #b91c1c;
+      --text: var(--mb-navy);
+      --muted: #6b7785;
+      --green: var(--mb-success);
+      --yellow: var(--mb-warning);
+      --radius: var(--mb-radius);
+      --shadow: var(--mb-shadow-sm);
+    }
+
+    body {
+      font-family: var(--mb-font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .logo {
+      font-size: 18px; font-weight: 800; letter-spacing: -.3px;
+      background: var(--mb-gradient); -webkit-background-clip: text;
+      background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border-radius: var(--mb-radius-pill);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background .15s, opacity .15s, box-shadow .15s, transform .1s;
+      text-decoration: none;
+    }
+    .btn-primary { background: var(--mb-gradient); color: #fff; box-shadow: 0 6px 18px rgba(49,76,231,.28); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(49,76,231,.36); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg); color: var(--text); }
+    .btn-danger { background: transparent; color: var(--danger); border: 1px solid transparent; }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Main ── */
+    main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .toolbar h2 { font-size: 20px; font-weight: 600; }
+    .page-count { font-size: 14px; color: var(--muted); margin-left: 8px; font-weight: 400; }
+
+    /* ── Grid ── */
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow .15s;
+    }
+    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1), 0 0 0 1px var(--border); }
+
+    .card-thumb {
+      height: 120px;
+      background: var(--mb-gradient-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      color: var(--mb-blue);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Ảnh preview lấy từ section đầu của LDP — phủ kín vùng thumb */
+    .card-thumb-img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block; z-index: 1;
+    }
+    .card-thumb-img.is-broken { display: none; }   /* ảnh lỗi → để hiện placeholder */
+    .card-thumb:hover .thumb-overlay { opacity: 1; }
+    .thumb-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 2;                 /* trên cả ảnh preview */
+      background: rgba(49,76,231,.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity .2s;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .card-body { padding: 14px 16px; flex: 1; }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .card-slug {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-family: monospace;
+    }
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+    .badge-draft { background: #fef3c7; color: var(--yellow); }
+    .badge-published { background: #dcfce7; color: var(--green); }
+    .card-date { font-size: 12px; color: var(--muted); }
+
+    .card-actions {
+      display: flex;
+      gap: 4px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      background: #fafafa;
+    }
+    .card-actions .spacer { flex: 1; }
+
+    /* ── States ── */
+    .state-box {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 20px;
+      text-align: center;
+      color: var(--muted);
+      gap: 12px;
+    }
+    .state-box svg { opacity: .35; }
+    .state-box p { font-size: 15px; }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+    }
+    .modal-backdrop.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 28px;
+      width: 100%;
+      max-width: 420px;
+      transform: translateY(12px);
+      transition: transform .2s;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .modal-backdrop.open .modal { transform: translateY(0); }
+    .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--muted); }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 7px;
+      font-size: 14px;
+      outline: none;
+      color: var(--text);
+      transition: border-color .15s;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: var(--primary); }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #fff;
+      z-index: 999;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .2s, transform .2s;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.success { background: #16a34a; }
+    #toast.error   { background: var(--danger); }
+
+    /* ── Confirm dialog ── */
+    .confirm-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .confirm-box {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .confirm-box h4 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .confirm-box p  { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+    .confirm-box .actions { display: flex; gap: 10px; justify-content: flex-end; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">⚡ LDP Builder</span>
+  <button class="btn btn-primary" id="btn-new">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    Tạo LDP mới
+  </button>
+</header>
+
+<main>
+  <div class="toolbar">
+    <h2>Danh sách Landing Pages <span class="page-count" id="count"></span></h2>
+  </div>
+  <div id="grid"></div>
+</main>
+
+<!-- Modal tạo mới -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <h3>Tạo Landing Page mới</h3>
+    <div class="form-group">
+      <label>Tên trang *</label>
+      <input type="text" id="input-name" placeholder="VD: Trang Chủ Sản Phẩm" maxlength="120" autocomplete="off" />
+    </div>
+    <div class="form-group">
+      <label>Trạng thái</label>
+      <select id="input-status">
+        <option value="draft">Draft</option>
+        <option value="published">Published</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-cancel">Hủy</button>
+      <button class="btn btn-primary" id="btn-create">Tạo & mở Editor</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  const grid    = document.getElementById('grid');
+  const countEl = document.getElementById('count');
+  const backdrop = document.getElementById('modal-backdrop');
+  const inputName   = document.getElementById('input-name');
+  const inputStatus = document.getElementById('input-status');
+  const toast   = document.getElementById('toast');
+  let toastTimer;
+
+  // ── Toast ──────────────────────────────────────────
+  function showToast(msg, type = 'success') {
+    clearTimeout(toastTimer);
+    toast.textContent = msg;
+    toast.className   = `show ${type}`;
+    toastTimer = setTimeout(() => { toast.className = ''; }, 2800);
+  }
+
+  // ── Định dạng ngày giờ ──────────────────────────────
+  const fmt = new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+  function fmtDate(iso) {
+    return fmt.format(new Date(iso));
+  }
+
+  // ── Gọi API ─────────────────────────────────────────
+  async function api(method, path, body) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(path, opts);
+    if (!res.ok) throw new Error((await res.json()).error || res.statusText);
+    return res.json();
+  }
+
+  // ── Render grid ─────────────────────────────────────
+  function renderGrid(pages) {
+    countEl.textContent = `(${pages.length})`;
+
+    if (!pages.length) {
+      grid.innerHTML = `
+        <div class="state-box">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="3"/>
+            <path d="M12 8v8M8 12h8"/>
+          </svg>
+          <p>Chưa có landing page nào. Hãy tạo trang đầu tiên!</p>
+        </div>`;
+      return;
+    }
+
+    grid.innerHTML = pages.map(p => `
+      <div class="card" data-id="${p.id}">
+        <div class="card-thumb" onclick="editPage(${p.id})" title="Mở editor">
+          ${p.preview
+            ? `<img class="card-thumb-img" src="${esc(p.preview)}" alt="" loading="lazy" onerror="this.classList.add('is-broken')"/>`
+            : ''}
+          <svg class="card-thumb-ph" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18M9 21V9"/>
+          </svg>
+          <div class="thumb-overlay">Mở Editor</div>
+        </div>
+        <div class="card-body">
+          <div class="card-title" title="${esc(p.name)}">${esc(p.name)}</div>
+          <div class="card-slug"><a href="/p/${p.slug}" target="_blank" style="color:inherit;text-decoration:none" title="Mở trang public">/p/${p.slug}</a></div>
+          <div class="card-meta">
+            <span class="badge badge-${p.status}">${p.status === 'published' ? '● Published' : '○ Draft'}</span>
+            <span class="card-date">${fmtDate(p.created_at)}</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-ghost btn-sm" onclick="editPage(${p.id})" title="Chỉnh sửa">
+            ✏️ Edit
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="viewPage('${p.slug}')" title="Mở trang public">
+            🌐 View
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="publishPage(${p.id},'${esc(p.name)}','${p.status}')" title="${p.status === 'published' ? 'Chuyển về Draft' : 'Publish trang này'}">
+            ${p.status === 'published' ? '⬇ Unpublish' : '🚀 Publish'}
+          </button>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost btn-sm" onclick="duplicatePage(${p.id}, '${esc(p.name)}')" title="Nhân bản">
+            ⧉
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="deletePage(${p.id}, '${esc(p.name)}')" title="Xóa">
+            🗑
+          </button>
+        </div>
+      </div>`).join('');
+  }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Load pages ───────────────────────────────────────
+  async function loadPages() {
+    grid.innerHTML = `<div class="state-box"><p>Đang tải...</p></div>`;
+    try {
+      const pages = await api('GET', '/api/pages');
+      renderGrid(pages);
+    } catch (e) {
+      grid.innerHTML = `<div class="state-box"><p>⚠️ Không tải được danh sách: ${e.message}</p></div>`;
+    }
+  }
+
+  // ── Actions ──────────────────────────────────────────
+  window.editPage = (id) => {
+    location.href = `/editor.html?id=${id}`;
+  };
+
+  window.viewPage = (slug) => {
+    window.open(`/p/${slug}`, '_blank');
+  };
+
+  window.publishPage = async (id, name, currentStatus) => {
+    const newStatus = currentStatus === 'published' ? 'draft' : 'published';
+    try {
+      await api('PUT', `/api/pages/${id}`, { status: newStatus });
+      showToast(
+        newStatus === 'published'
+          ? `🌐 Đã publish "${name}"`
+          : `✓ Đã chuyển "${name}" về Draft`
+      );
+      loadPages();
+    } catch (e) {
+      showToast('Thất bại: ' + e.message, 'error');
+    }
+  };
+
+  window.duplicatePage = async (id, name) => {
+    try {
+      const p = await api('GET', `/api/pages/${id}`);
+      const copy = await api('POST', '/api/pages', {
+        name           : `Copy of ${p.name}`,
+        html           : p.html,
+        css            : p.css,
+        components_json: p.components_json,
+        status         : 'draft',
+      });
+      showToast(`✓ Đã nhân bản "${p.name}"`);
+      loadPages();
+    } catch (e) {
+      showToast('Nhân bản thất bại: ' + e.message, 'error');
+    }
+  };
+
+  window.deletePage = (id, name) => {
+    confirm2(
+      'Xóa Landing Page',
+      `Bạn có chắc muốn xóa "${name}"? Hành động này không thể hoàn tác.`,
+      async () => {
+        try {
+          await api('DELETE', `/api/pages/${id}`);
+          showToast(`✓ Đã xóa "${name}"`);
+          loadPages();
+        } catch (e) {
+          showToast('Xóa thất bại: ' + e.message, 'error');
+        }
+      }
+    );
+  };
+
+  // ── Confirm dialog ───────────────────────────────────
+  function confirm2(title, msg, onConfirm) {
+    const el = document.createElement('div');
+    el.className = 'confirm-backdrop';
+    el.innerHTML = `
+      <div class="confirm-box">
+        <h4>${esc(title)}</h4>
+        <p>${esc(msg)}</p>
+        <div class="actions">
+          <button class="btn btn-ghost" id="c-cancel">Hủy</button>
+          <button class="btn btn-primary" style="background:var(--danger)" id="c-ok">Xóa</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    const close = () => el.remove();
+    el.querySelector('#c-cancel').onclick = close;
+    el.querySelector('#c-ok').onclick = () => { close(); onConfirm(); };
+    el.onclick = (e) => { if (e.target === el) close(); };
+  }
+
+  // ── Modal tạo mới ────────────────────────────────────
+  function openModal() {
+    inputName.value   = '';
+    inputStatus.value = 'draft';
+    backdrop.classList.add('open');
+    setTimeout(() => inputName.focus(), 150);
+  }
+  function closeModal() { backdrop.classList.remove('open'); }
+
+  document.getElementById('btn-new').onclick    = openModal;
+  document.getElementById('btn-cancel').onclick = closeModal;
+  backdrop.onclick = (e) => { if (e.target === backdrop) closeModal(); };
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  inputName.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-create').click();
+  });
+
+  document.getElementById('btn-create').onclick = async () => {
+    const name   = inputName.value.trim();
+    const status = inputStatus.value;
+    if (!name) { inputName.focus(); return; }
+
+    const btn = document.getElementById('btn-create');
+    btn.disabled = true;
+    btn.textContent = 'Đang tạo...';
+
+    try {
+      const page = await api('POST', '/api/pages', { name, status });
+      location.href = `/editor.html?id=${page.id}`;
+    } catch (e) {
+      showToast('Tạo thất bại: ' + e.message, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Tạo & mở Editor';
+    }
+  };
+
+  // ── Khởi động ────────────────────────────────────────
+  loadPages();
+}());
+</script>
+</body>
+</html>

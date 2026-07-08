@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+  <title>Editor — LDP Builder</title>
+  <link rel="stylesheet" href="/vendor/grapes.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+  <link rel="stylesheet" href="/theme.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; font-family: var(--mb-font); }
+
+    /* ───────── Bố cục playground: trái | giữa | phải ───────── */
+    .ldp-app   { display: flex; height: 100vh; background: #eef1f6; }
+    .ldp-left,
+    .ldp-right { background: #ffffff; display: flex; flex-direction: column; overflow: hidden; }
+    .ldp-left  { width: var(--ldp-left-w, 184px);  flex: 0 0 var(--ldp-left-w, 184px);  border-right: 1px solid var(--mb-border); }
+    .ldp-right { width: var(--ldp-right-w, 184px); flex: 0 0 var(--ldp-right-w, 184px); border-left: 1px solid var(--mb-border); }
+
+    /* Thanh kéo chỉnh độ rộng panel */
+    .ldp-resizer { flex: 0 0 5px; cursor: col-resize; background: transparent; z-index: 20; }
+    .ldp-resizer:hover, .ldp-resizer.dragging { background: var(--mb-blue-light); }
+
+    /* Thu gọn panel Blocks → canvas trải rộng */
+    .ldp-collapsed .ldp-left { flex-basis: 0 !important; width: 0 !important; border-right: none; }
+    .ldp-collapsed .ldp-resizer[data-side="left"] { display: none; }
+    .ldp-collapse-btn {
+      margin-left: auto; width: 26px; height: 26px; flex: 0 0 26px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; background: rgba(255,255,255,.2); color: #fff;
+      border-radius: 7px; cursor: pointer; font-size: 14px;
+    }
+    .ldp-collapse-btn:hover { background: rgba(255,255,255,.35); }
+    .ldp-expand-btn {
+      display: none; position: fixed; left: 0; top: 64px; z-index: 5000;
+      width: 30px; height: 40px; align-items: center; justify-content: center;
+      border: none; background: var(--mb-gradient); color: #fff; cursor: pointer;
+      border-radius: 0 8px 8px 0; box-shadow: var(--mb-shadow-sm); font-size: 15px;
+    }
+    .ldp-collapsed .ldp-expand-btn { display: flex; }
+    .ldp-center{ flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+
+    /* Tiêu đề panel trái — thanh thương hiệu MB */
+    .ldp-head  { display: flex; align-items: center; gap: 8px;
+                 padding: 14px 16px; color: #fff; font-size: 13px; font-weight: 700;
+                 letter-spacing: .06em; text-transform: uppercase;
+                 background: var(--mb-gradient); }
+    .ldp-head::before {
+      content: ''; width: 18px; height: 18px; border-radius: 5px;
+      background: rgba(255,255,255,.9);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z'/%3E%3C/svg%3E") center/contain no-repeat;
+              mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z'/%3E%3C/svg%3E") center/contain no-repeat;
+    }
+
+    /* Thanh công cụ trên cùng — glassmorphism */
+    .ldp-topbar{ height: 50px; flex: 0 0 50px; display: flex; align-items: center;
+                 justify-content: space-between; padding: 0 10px;
+                 background: var(--mb-glass-bg); backdrop-filter: var(--mb-glass-blur);
+                 -webkit-backdrop-filter: var(--mb-glass-blur);
+                 border-bottom: 1px solid var(--mb-glass-border); }
+    .ldp-tb-group { display: flex; align-items: center; gap: 2px; }
+
+    /* Cụm công cụ phải (zoom + thiết bị) — fixed trên body để GrapesJS không xóa */
+    .ldp-tools {
+      position: fixed; top: 7px; right: calc(var(--ldp-right-w, 184px) + 16px); z-index: 5000;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ldp-dev-dd { position: relative; }
+    .ldp-dev-toggle {
+      display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px;
+      border: 1px solid var(--mb-border); background: #fff; color: var(--mb-navy);
+      border-radius: 999px; cursor: pointer; font: 600 13px var(--mb-font);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .ldp-dev-toggle:hover { border-color: var(--mb-blue); box-shadow: 0 2px 8px rgba(49,76,231,.12); }
+    .ldp-dev-toggle .dd-icon svg { display: block; width: 18px; height: 18px; }
+    .ldp-dev-toggle .caret { transition: transform .15s; }
+    .ldp-dev-dd.open .ldp-dev-toggle .caret { transform: rotate(180deg); }
+
+    .ldp-dev-menu {
+      position: absolute; top: calc(100% + 8px); right: 0; min-width: 180px;
+      background: #fff; border: 1px solid var(--mb-border); border-radius: 12px;
+      box-shadow: var(--mb-shadow); padding: 6px; z-index: 1000; display: none;
+    }
+    .ldp-dev-dd.open .ldp-dev-menu { display: block; }
+    .ldp-dev-menu button {
+      display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px;
+      border: none; background: transparent; color: var(--mb-navy); cursor: pointer;
+      border-radius: 8px; font: 500 13px var(--mb-font); text-align: left;
+    }
+    .ldp-dev-menu button svg { width: 18px; height: 18px; flex: 0 0 18px; }
+    .ldp-dev-menu button:hover  { background: var(--mb-blue-50); color: var(--mb-blue); }
+    .ldp-dev-menu button.active { background: var(--mb-blue); color: #fff; }
+    .ldp-dev-menu button .dd-sub { margin-left: auto; font-size: 11px; opacity: .6; }
+
+    /* Điều khiển Zoom */
+    .ldp-zoom {
+      display: inline-flex; align-items: center;
+      border: 1px solid var(--mb-border); border-radius: 999px; background: #fff; overflow: hidden;
+    }
+    .ldp-zoom-btn {
+      width: 30px; height: 34px; border: none; background: transparent;
+      color: var(--mb-navy); font-size: 18px; line-height: 1; cursor: pointer;
+    }
+    .ldp-zoom-btn:hover { background: var(--mb-blue-50); color: var(--mb-blue); }
+    .ldp-zoom-input {
+      width: 36px; height: 34px; border: none; text-align: right;
+      font: 600 12px var(--mb-font); color: var(--mb-navy); background: transparent;
+      border-left: 1px solid var(--mb-border); padding: 0 1px;
+    }
+    .ldp-zoom-input:focus { outline: none; color: var(--mb-blue); }
+    .ldp-zoom-pct { font: 600 12px var(--mb-font); color: var(--mb-navy); padding: 0 4px 0 1px; }
+    .ldp-zoom-fit { border-left: 1px solid var(--mb-border); font-size: 14px; }
+
+    /* Panel button GrapesJS trong topbar */
+    .ldp-topbar .gjs-pn-btn { color: var(--mb-navy); border-radius: 8px; margin: 0 1px; padding: 6px; }
+    .ldp-topbar .gjs-pn-btn svg { display: block; }
+    .ldp-topbar .gjs-pn-btn:hover  { color: var(--mb-blue); background: var(--mb-blue-50); }
+    .ldp-topbar .gjs-pn-btn.gjs-pn-active { color: #fff; background: var(--mb-blue); }
+    .gjs-pn-btn.is-published,
+    .gjs-pn-btn.is-published svg { color: var(--mb-success) !important; }
+
+    /* Vùng canvas */
+    #gjs { flex: 1 1 auto; overflow: hidden; }
+
+    /* Cột chứa block (scroll) — đặt cỡ chữ gốc như GrapesJS để widget không bị phóng to */
+    #blocks { flex: 1 1 auto; overflow-y: auto; padding: 6px; font-size: 0.75rem; }
+    .ldp-pane { font-size: 0.75rem; }
+
+    /* Tabs panel phải */
+    .ldp-tabs { display: flex; background: #fff; border-bottom: 1px solid var(--mb-border); }
+    .ldp-tabs button {
+      flex: 1; padding: 13px 6px; background: transparent; border: none; cursor: pointer;
+      color: #8a96a6; font-size: 12px; font-weight: 600; letter-spacing: .03em;
+      font-family: var(--mb-font);
+      border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+    }
+    .ldp-tabs button:hover  { color: var(--mb-navy); }
+    .ldp-tabs button.active { color: var(--mb-blue); border-bottom-color: var(--mb-blue); }
+    .ldp-pane { flex: 1 1 auto; overflow-y: auto; }
+
+    /* Scrollbar mảnh */
+    #blocks::-webkit-scrollbar, .ldp-pane::-webkit-scrollbar { width: 8px; }
+    #blocks::-webkit-scrollbar-thumb, .ldp-pane::-webkit-scrollbar-thumb {
+      background: #cdd7e3; border-radius: 99px; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px; padding: 11px 20px;
+      border-radius: var(--mb-radius-pill); color: #fff; font: 13px/1.4 var(--mb-font);
+      font-weight: 600; z-index: 99999; opacity: 0; box-shadow: var(--mb-shadow);
+      transform: translateY(8px); transition: opacity .25s, transform .25s; pointer-events: none;
+    }
+    #toast.show    { opacity: 1; transform: translateY(0); }
+    #toast.success { background: var(--mb-success); }
+    #toast.error   { background: var(--mb-error); }
+    #toast.saving  { background: var(--mb-blue); }
+
+    /* Modal import: textarea */
+    .ldp-imp-ta {
+      width: 100%; font: 13px/1.5 monospace; padding: 12px; border: 1px solid var(--mb-border);
+      border-radius: var(--mb-radius-sm); box-sizing: border-box; resize: vertical;
+    }
+    .ldp-imp-ta:focus { outline: none; border-color: var(--mb-blue); }
+    .ldp-imp-go { font-family: var(--mb-font); }
+
+    /* Trait "đổi ảnh SVG" — preview + text, bấm để đổi */
+    .ldp-svg-trait {
+      display: flex; align-items: center; gap: 10px; padding: 8px; margin: 4px 0;
+      border: 1px solid var(--mb-border); border-radius: 8px; cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .ldp-svg-trait:hover { border-color: var(--mb-blue); background: var(--mb-blue-50); }
+    .ldp-svg-prev {
+      width: 40px; height: 40px; flex: 0 0 40px; display: flex; align-items: center;
+      justify-content: center; background: #f5f7fa; border-radius: 6px; color: var(--mb-navy);
+    }
+    .ldp-svg-prev svg { width: 26px !important; height: 26px !important; }
+    .ldp-svg-prev img { max-width: 32px; max-height: 32px; }
+    .ldp-svg-txt { display: flex; flex-direction: column; font: 600 12px var(--mb-font); color: var(--mb-navy); }
+    .ldp-svg-txt small { font-weight: 400; font-size: 11px; color: #8a96a6; }
+
+    /* Căn giữa khung thiết bị trong canvas kể cả khi khung (Desktop 1280px) rộng
+       hơn vùng canvas. GrapesJS ghim frame-wrapper sang trái (left:0 + margin âm)
+       khi frame > canvas; lúc zoom < 100% (scale quanh tâm canvas) frame bị lệch
+       phải. Ép căn giữa thật bằng left:50% + translateX(-50%). */
+    .gjs-frame-wrapper {
+      left: 50% !important; right: auto !important; margin: 0 !important;
+      transform: translateX(-50%) !important;
+    }
+    /* Thu hồi dải trống mặc định phía trên canvas (GrapesJS chừa 40px cho panel
+       cũ mà ta không dùng) → canvas dùng full chiều cao, khung sát mép trên. */
+    .gjs-cv-canvas { top: 0 !important; height: 100% !important; }
+
+    /* Trait "Ẩn phần tử" — công tắc toggle theo thiết bị */
+    .ldp-vis-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 2px 0; user-select: none; }
+    .ldp-vis-cb { position: absolute; opacity: 0; width: 0; height: 0; }
+    .ldp-vis-slider {
+      position: relative; flex: 0 0 38px; width: 38px; height: 22px; border-radius: 99px;
+      background: #cbd5e1; transition: background .15s;
+    }
+    .ldp-vis-slider::after {
+      content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .15s;
+    }
+    .ldp-vis-cb:checked + .ldp-vis-slider { background: var(--mb-blue); }
+    .ldp-vis-cb:checked + .ldp-vis-slider::after { transform: translateX(16px); }
+    .ldp-vis-hint { font: 400 11px var(--mb-font); color: #8a96a6; }
+  </style>
+</head>
+<body>
+
+<div class="ldp-app">
+  <!-- TRÁI: Blocks -->
+  <aside class="ldp-left">
+    <div class="ldp-head">
+      <span>Blocks</span>
+      <button class="ldp-collapse-btn" id="btn-collapse-blocks" title="Thu gọn panel">◀</button>
+    </div>
+    <div id="blocks"></div>
+  </aside>
+  <button class="ldp-expand-btn" id="btn-expand-blocks" title="Mở lại panel Blocks">▶</button>
+  <div class="ldp-resizer" data-side="left" title="Kéo để chỉnh độ rộng"></div>
+
+  <!-- GIỮA: toolbar + canvas -->
+  <main class="ldp-center">
+    <div class="ldp-topbar">
+      <div id="tb-actions" class="ldp-tb-group"></div>
+      <div id="tb-right" class="ldp-tb-group"></div>
+    </div>
+    <div id="gjs"></div>
+  </main>
+
+  <div class="ldp-resizer" data-side="right" title="Kéo để chỉnh độ rộng"></div>
+
+  <!-- PHẢI: Styles / Settings / Layers -->
+  <aside class="ldp-right">
+    <div class="ldp-tabs">
+      <button data-tab="styles" class="active">Styles</button>
+      <button data-tab="traits">Settings</button>
+      <button data-tab="layers">Layers</button>
+    </div>
+    <div id="pane-styles" class="ldp-pane">
+      <div id="sel-manager"></div>
+      <div id="styles"></div>
+    </div>
+    <div id="pane-traits" class="ldp-pane" style="display:none;">
+      <div id="traits"></div>
+    </div>
+    <div id="pane-layers" class="ldp-pane" style="display:none;">
+      <div id="layers"></div>
+    </div>
+  </aside>
+</div>
+<div id="toast"></div>
+
+<script src="/vendor/grapes.min.js"></script>
+<script src="/vendor/gjs-blocks-basic.js"></script>
+<script src="/vendor/gjs-plugin-forms.js"></script>
+<script src="/vendor/gjs-countdown.js"></script>
+<script src="/vendor/gjs-plugin-export.js"></script>
+<script src="/vendor/gjs-style-bg.js"></script>
+<script src="/blocks.js"></script>
+<script>
+(function () {
+  // --- Lấy page ID từ ?id= ---
+  const params = new URLSearchParams(location.search);
+  const pageId = params.get('id');
+
+  if (!pageId) {
+    document.body.innerHTML = `
+      <div style="padding:60px;font-family:sans-serif;color:#ddd;background:#1e1e1e;height:100vh">
+        <h2 style="color:#e53935;margin-bottom:12px">Thiếu page ID</h2>
+        <p>Vui lòng mở editor từ <a href="/" style="color:#90caf9">dashboard</a>.</p>
+      </div>`;
+    return;
+  }
+
+  // --- Metadata của page (slug, status) ---
+  let pageMeta = { slug: '', status: 'draft' };
+  // JS của trang (vd: script chuyển tab) — giữ lại khi import, chèn vào trang public
+  let currentJs = '';
+
+  // --- Toast helper ---
+  const toast = document.getElementById('toast');
+  let toastTimer;
+  function showToast(msg, type = 'success', duration = 2500) {
+    clearTimeout(toastTimer);
+    toast.textContent = msg;
+    toast.className   = `show ${type}`;
+    toastTimer = setTimeout(() => { toast.className = ''; }, duration);
+  }
+
+  // --- Đăng ký plugin từ CDN (UMD gán vào window["tên-package"]) ---
+  const PLUGIN_GLOBALS = {
+    'blocks-basic'   : 'gjs-blocks-basic',
+    'forms'          : 'grapesjs-plugin-forms',
+    'countdown'      : 'grapesjs-component-countdown',
+    'export'         : 'grapesjs-plugin-export',
+    'style-bg'       : 'grapesjs-style-bg',
+  };
+  const activePlugins = [];
+  Object.entries(PLUGIN_GLOBALS).forEach(([id, globalKey]) => {
+    const g = window[globalKey];
+    // Bundle UMD export dạng ES module → { default: fn }; lấy .default nếu có
+    const fn = (g && typeof g === 'object' && typeof g.default === 'function') ? g.default : g;
+    if (typeof fn === 'function') {
+      grapesjs.plugins.add(id, fn);
+      activePlugins.push(id);
+    } else {
+      console.error(`[LDP] Plugin "${globalKey}" không nạp được (thiếu file /vendor).`);
+    }
+  });
+
+  // --- Icon SVG cho toolbar ---
+  const SVG = (p, opts = '') => `<svg viewBox="0 0 24 24" width="18" height="18" ${opts || 'fill="currentColor"'}>${p}</svg>`;
+  const ICONS = {
+    home    : SVG('<path d="M11 3 2 12h3v8h5v-6h4v6h5v-8h3z"/>'),
+    edit    : SVG('<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z"/>'),
+    desktop : SVG('<path d="M21 2H3a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h7v2H7v2h10v-2h-3v-2h7a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zm-1 12H4V4h16v10z"/>'),
+    tablet  : SVG('<path d="M19 1H5a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm-7 21a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm7-4H5V4h14v14z"/>'),
+    mobile  : SVG('<path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm-5 21a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm5-4H7V4h10v14z"/>'),
+    borders : SVG('<path d="M3 3h18v18H3zm2 2v14h14V5z" opacity=".9"/>'),
+    import  : SVG('<path d="M5 20h14v-2H5zM12 2 6 9h4v6h4V9h4z"/>'),
+    code    : SVG('<path d="M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4m5.2 0L19.2 12l-4.6-4.6L16 6l6 6-6 6-1.4-1.4Z"/>'),
+    eye     : SVG('<path d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5C21.3 7.6 17 4.5 12 4.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>'),
+    full    : SVG('<path d="M7 14H5v5h5v-2H7zm-2-4h2V7h3V5H5zm12 7h-3v2h5v-5h-2zM14 5v2h3v3h2V5z"/>'),
+    undo    : SVG('<path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/>'),
+    redo    : SVG('<path d="M12 5V1l5 5-5 5V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8z"/>'),
+    trash   : SVG('<path d="M6 7h12l-1 14H7zm3-4h6l1 2h4v2H2V5h4z"/>'),
+    save    : SVG('<path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z"/>'),
+    globe   : SVG('<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z" fill="none" stroke="#333" stroke-width="1.4"/>'),
+    external: SVG('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 3h6v6M21 3l-9 9" fill="none" stroke="currentColor" stroke-width="2"/>'),
+  };
+
+  // --- Khởi tạo GrapesJS với layout tùy chỉnh (appendTo) ---
+  const editor = grapesjs.init({
+    container : '#gjs',
+    height    : '100%',
+    fromElement: false,
+
+    // Nạp font Averta vào canvas iframe để vùng chỉnh sửa hiển thị đúng font
+    canvas: { styles: ['/fonts.css'] },
+
+    plugins    : activePlugins,
+    pluginsOpts: {
+      'blocks-basic': {
+        flexGrid: true, category: 'Bố cục',
+        labelColumn1: '1 Cột', labelColumn2: '2 Cột', labelColumn3: '3 Cột',
+        labelColumn37: '2 Cột 3/7', labelText: 'Văn bản', labelLink: 'Liên kết',
+        labelImage: 'Hình ảnh', labelVideo: 'Video', labelMap: 'Bản đồ',
+      },
+      'forms': {
+        category: 'Biểu mẫu', labelForm: 'Form', labelInput: 'Ô nhập',
+        labelTextarea: 'Ô nhập dài', labelSelect: 'Dropdown', labelButton: 'Nút Submit',
+        labelLabel: 'Nhãn', labelCheckbox: 'Checkbox', labelRadio: 'Radio',
+      },
+      'countdown': { label: 'Đếm ngược' },
+    },
+
+    // Render các manager vào container tùy chỉnh
+    blockManager   : { appendTo: '#blocks' },
+    layerManager   : { appendTo: '#layers' },
+    traitManager   : { appendTo: '#traits' },
+    selectorManager: { appendTo: '#sel-manager', componentFirst: true },
+
+    deviceManager: {
+      devices: [
+        // Desktop có bề rộng thiết kế CỐ ĐỊNH (1280px) để vẽ pixel ổn định và
+        // khớp với bản publish (mô hình 2 layout cố định + scale-to-fit).
+        // Mỗi thiết bị có MEDIA QUERY RIÊNG (không còn lớp nền chung) để style
+        // desktop ↔ mobile tách biệt: Desktop → (min-width:576px), Mobile →
+        // (max-width:575px). Xem patch getCurrentMedia ở dưới.
+        { id: 'Desktop', name: 'Desktop', width: '1280px', widthMedia: '576px', mediaCondition: 'min-width' },
+        { id: 'Mobile',  name: 'Mobile',  width: '375px', widthMedia: '575px', mediaCondition: 'max-width' },
+      ],
+    },
+
+    styleManager: {
+      appendTo: '#styles',
+      sectors: [
+        { name: 'Bố cục', open: false, buildProps: ['display','flex-direction','justify-content','align-items','flex-wrap','gap','float','position','top','right','bottom','left','z-index'] },
+        { name: 'Kích thước & Khoảng cách', open: true, buildProps: ['width','height','min-height','max-width','padding','margin'] },
+        { name: 'Chữ (Typography)', open: false, buildProps: ['font-family','font-size','font-weight','letter-spacing','color','line-height','text-align','text-decoration','font-style','text-shadow'] },
+        { name: 'Nền (Background)', open: false, buildProps: ['background-color','background','background-image','background-repeat','background-position','background-size'] },
+        { name: 'Viền & Đổ bóng', open: false, buildProps: ['border-radius','border','box-shadow'] },
+        { name: 'Hiệu ứng', open: false, buildProps: ['opacity','transition','transform','cursor','overflow'] },
+      ],
+    },
+
+    // Thanh công cụ — chỉ panel 'actions' dùng GrapesJS panel.
+    // Dropdown chuyển thiết bị tạo bằng JS vào #tb-right (xem phần dưới).
+    panels: {
+      defaults: [
+        {
+          id: 'actions', el: '#tb-actions',
+          buttons: [
+            { id: 'cmd-home',      command: 'cmd-home',      label: ICONS.home,    togglable: false, attributes: { title: 'Về Danh sách Landing Page' } },
+            { id: 'sw-visibility', command: 'sw-visibility', label: ICONS.borders, active: true, togglable: true, attributes: { title: 'Bật/tắt viền khối' } },
+            { id: 'cmd-edit-code', command: 'cmd-edit-code', label: ICONS.code, togglable: false, attributes: { title: 'Mã trang — Xem / Sửa / Import / Export ZIP' } },
+            { id: 'preview',    command: 'preview',    label: ICONS.eye,  togglable: false, attributes: { title: 'Xem trước (ESC để thoát)' } },
+            { id: 'fullscreen', command: 'fullscreen', label: ICONS.full, togglable: true,  attributes: { title: 'Toàn màn hình' } },
+            { id: 'core-undo',  command: 'core:undo',  label: ICONS.undo, togglable: false, attributes: { title: 'Hoàn tác' } },
+            { id: 'core-redo',  command: 'core:redo',  label: ICONS.redo, togglable: false, attributes: { title: 'Làm lại' } },
+            { id: 'canvas-clear', command: 'canvas-clear', label: ICONS.trash, togglable: false, attributes: { title: 'Xóa toàn bộ canvas' } },
+            { id: 'btn-save',   command: 'cmd-save',   label: ICONS.save,  togglable: false, attributes: { title: 'Lưu (Ctrl+S)' } },
+            { id: 'btn-publish',command: 'cmd-publish',label: ICONS.globe, togglable: false, attributes: { title: 'Publish' } },
+            { id: 'btn-view-public', command: 'cmd-view-public', label: ICONS.external, togglable: false, attributes: { title: 'Xem trang public' } },
+          ],
+        },
+      ],
+    },
+
+    assetManager: {
+      upload     : '/api/upload',
+      uploadName : 'files',
+      multiUpload: true,
+      autoAdd    : true,
+      assets     : [],
+      uploadText : 'Kéo thả ảnh vào đây hoặc bấm để chọn',
+    },
+
+    storageManager: {
+      type    : 'remote',
+      autosave: false,
+      autoload: true,
+      options : {
+        remote: {
+          urlLoad : `/api/pages/${pageId}`,
+          urlStore: `/api/pages/${pageId}`,
+          fetchOptions: (opts) => opts.body ? { method: 'PUT' } : {},
+          onStore: (data, ed) => ({
+            html           : ed.getHtml(),
+            css            : ed.getCss(),
+            js             : currentJs,
+            components_json: JSON.stringify(data),
+          }),
+          onLoad: (result) => {
+            currentJs = result.js || '';
+            if (result.components_json) {
+              try {
+                const parsed = JSON.parse(result.components_json);
+                if (parsed && typeof parsed === 'object' && parsed.pages) return parsed;
+              } catch (_) {}
+            }
+            return { pages: [{ component: result.html || '', styles: result.css || '' }] };
+          },
+        },
+      },
+    },
+  });
+
+  // ───────── Tách style theo thiết bị (Desktop ↔ Mobile độc lập) ─────────
+  // Mặc định GrapesJS dùng MỘT mediaCondition chung và coi device không có
+  // widthMedia là "lớp nền" (style desktop rò xuống mobile). Ở đây mỗi device
+  // có điều kiện riêng → không còn lớp nền chung:
+  //   Desktop → @media (min-width: 576px) · Mobile → @media (max-width: 575px)
+  // Patch getCurrentMedia để dùng `mediaCondition` của TỪNG device khi ghi style.
+  (function patchPerDeviceMedia() {
+    const em = editor.getModel();
+    em.getCurrentMedia = function () {
+      const dev = this.getDeviceModel();
+      if (!dev || this.config.devicePreviewMode) return '';
+      const wm = dev.get('widthMedia');
+      if (!wm) return '';
+      const cond = dev.get('mediaCondition') || this.config.mediaCondition || 'max-width';
+      return `(${cond}: ${wm})`;
+    };
+    // Đảm bảo thuộc tính mediaCondition tồn tại trên model device sau khi nạp.
+    editor.on('load', () => {
+      const dm = editor.DeviceManager;
+      const setCond = (id, c) => { const d = dm.get(id); if (d && !d.get('mediaCondition')) d.set('mediaCondition', c); };
+      setCond('Desktop', 'min-width');
+      setCond('Mobile', 'max-width');
+    });
+  })();
+
+  // --- Block tùy chỉnh (định nghĩa trong /blocks.js) ---
+  if (typeof window.registerLdpBlocks === 'function') {
+    window.registerLdpBlocks(editor);
+  } else {
+    console.error('[LDP] /blocks.js không tải được — thiếu block tùy chỉnh.');
+  }
+
+  // --- Trait bổ sung cho link/nút bấm ---
+  editor.DomComponents.addType('link', {
+    isComponent: (el) => el.tagName === 'A',
+    model: {
+      defaults: {
+        traits: [
+          { type: 'text', name: 'href',  label: 'Liên kết (URL)' },
+          { type: 'text', name: 'title', label: 'Tooltip' },
+          { type: 'select', name: 'target', label: 'Mở ở', options: [
+            { id: '_self', name: 'Cùng tab' }, { id: '_blank', name: 'Tab mới' },
+          ] },
+        ],
+      },
+    },
+  });
+
+  // ───────── Đổi ảnh SVG: thay <svg> bằng <img> (upload / dán link) ─────────
+  function ldpReplaceSvg(cmp, src) {
+    if (!cmp || !src) return;
+    const parent = cmp.parent();
+    if (!parent) return;
+    const at = cmp.index();
+    const classes = cmp.getClasses ? cmp.getClasses() : [];
+    const style = cmp.getStyle ? cmp.getStyle() : {};
+    parent.append({ type: 'image', attributes: { src, alt: '' }, classes, style }, { at });
+    cmp.remove();
+  }
+  // Trait tùy chỉnh: nút mở Asset Manager (hỗ trợ upload file & dán link)
+  function openSvgPicker() {
+    const cmp = editor.getSelected();
+    editor.AssetManager.open({
+      types: ['image'],
+      select(asset, complete) {
+        const src = asset.getSrc ? asset.getSrc() : (asset.get && asset.get('src'));
+        ldpReplaceSvg(cmp, src);
+        if (complete) editor.AssetManager.close();
+      },
+    });
+  }
+  editor.TraitManager.addType('svg-replace', {
+    noLabel: true,
+    templateInput: '',
+    createInput({ trait }) {
+      const cmp = (trait && trait.target) || editor.getSelected();
+      let preview = '';
+      try { preview = cmp ? cmp.toHTML() : ''; } catch (e) {}
+      const wrap = document.createElement('div');
+      wrap.className = 'ldp-svg-trait';
+      wrap.title = 'Bấm để đổi ảnh (upload hoặc dán link)';
+      wrap.innerHTML =
+        '<div class="ldp-svg-prev">' + preview + '</div>' +
+        '<div class="ldp-svg-txt">Ảnh hiện tại<small>Bấm để đổi (upload / link)</small></div>';
+      wrap.addEventListener('click', openSvgPicker);
+      return wrap;
+    },
+  });
+  // Gắn trait vào component type 'svg'
+  editor.DomComponents.addType('svg', {
+    model: { defaults: { traits: [{ type: 'svg-replace', name: 'svgReplace' }] } },
+  });
+
+  // Trait đổi ảnh cho component 'ảnh' (preview + bấm để upload/dán link)
+  editor.TraitManager.addType('image-src', {
+    noLabel: true,
+    templateInput: '',
+    createInput({ trait }) {
+      const cmp = (trait && trait.target) || editor.getSelected();
+      // Lấy URL ảnh ĐANG hiển thị thật trong canvas (currentSrc xử lý cả srcset)
+      let src = '';
+      try {
+        let el = cmp && cmp.getEl && cmp.getEl();
+        if (!el && cmp && cmp.getId) {
+          const cdoc = editor.Canvas.getDocument();
+          el = cdoc && cdoc.getElementById(cmp.getId());
+        }
+        if (el) src = el.currentSrc || el.src || '';
+        if (!src && cmp) src = cmp.get('src') || (cmp.getAttributes && cmp.getAttributes().src) || '';
+      } catch (e) {}
+
+      const wrap = document.createElement('div');
+      wrap.className = 'ldp-svg-trait';
+      wrap.title = 'Bấm để đổi ảnh (upload hoặc dán link)';
+
+      const prev = document.createElement('div');
+      prev.className = 'ldp-svg-prev';
+      if (src) {
+        const im = document.createElement('img');
+        im.src = src;                       // gán bằng property → không lỗi escape ký tự đặc biệt
+        im.onerror = () => { prev.textContent = '🖼️'; };  // ảnh lỗi → hiện icon thay
+        prev.appendChild(im);
+      } else {
+        prev.textContent = '🖼️';
+      }
+      const txt = document.createElement('div');
+      txt.className = 'ldp-svg-txt';
+      txt.innerHTML = 'Ảnh hiện tại<small>Bấm để đổi (upload / link)</small>';
+      wrap.appendChild(prev);
+      wrap.appendChild(txt);
+
+      wrap.addEventListener('click', () => {
+        const c = editor.getSelected();
+        editor.AssetManager.open({
+          types: ['image'],
+          select(asset, complete) {
+            const s = asset.getSrc ? asset.getSrc() : (asset.get && asset.get('src'));
+            if (c && s) { c.set('src', s); if (c.removeAttributes) c.removeAttributes(['srcset', 'sizes']); }
+            if (complete) editor.AssetManager.close();
+          },
+        });
+      });
+      return wrap;
+    },
+  });
+
+  // ───────── Component 'ảnh': trait Đổi ảnh + Link + Mở ở (bọc <a> khi xuất HTML) ─────────
+  const imgToHTML = editor.DomComponents.getType('image').model.prototype.toHTML;
+  editor.DomComponents.addType('image', {
+    model: {
+      defaults: {
+        traits: [
+          { type: 'image-src', name: 'imageSrc' },
+          { type: 'text',   name: 'alt',         label: 'Alt (mô tả ảnh)' },
+          { type: 'text',   name: 'data-href',   label: 'Link khi bấm (URL)', placeholder: 'https://...' },
+          { type: 'select', name: 'data-target', label: 'Mở link ở', options: [
+            { id: '',       name: 'Cùng cửa sổ' },
+            { id: '_blank', name: 'Tab mới' },
+          ] },
+        ],
+      },
+      // Nếu có data-href → xuất ảnh bọc trong <a href target>
+      toHTML(opts) {
+        let html = imgToHTML.call(this, opts);
+        const attr = this.getAttributes();
+        const href = (attr['data-href'] || '').trim();
+        if (!href) return html;
+        const target = attr['data-target'] ? ' target="' + attr['data-target'] + '" rel="noopener"' : '';
+        html = html.replace(/\s*data-(?:href|target)="[^"]*"/g, '');  // bỏ data-* khỏi <img>
+        return '<a href="' + href + '"' + target + '>' + html + '</a>';
+      },
+    },
+  });
+
+  // ───────── Component 'button' (form): thêm Link + Mở ở; xuất <a> nếu có link ─────────
+  const btnType = editor.DomComponents.getType('button');
+  if (btnType) {
+    const btnToHTML = btnType.model.prototype.toHTML;
+    let btnBaseTraits = [];
+    try {
+      const proto = btnType.model.prototype;
+      const def = typeof proto.defaults === 'function' ? proto.defaults.call(proto) : proto.defaults;
+      btnBaseTraits = (def && def.traits) ? def.traits.slice() : [];
+    } catch (e) {}
+    if (!btnBaseTraits.length) {
+      btnBaseTraits = [
+        { name: 'text', label: 'Text' },
+        { type: 'select', name: 'type', label: 'Type', options: [
+          { id: 'button', name: 'button' }, { id: 'submit', name: 'submit' }, { id: 'reset', name: 'reset' },
+        ] },
+      ];
+    }
+    editor.DomComponents.addType('button', {
+      model: {
+        defaults: {
+          traits: [
+            ...btnBaseTraits,
+            { type: 'text',   name: 'data-href',   label: 'Link khi bấm (URL)', placeholder: 'https://...' },
+            { type: 'select', name: 'data-target', label: 'Mở link ở', options: [
+              { id: '', name: 'Cùng cửa sổ' }, { id: '_blank', name: 'Tab mới' },
+            ] },
+          ],
+        },
+        toHTML(opts) {
+          let html = btnToHTML.call(this, opts);
+          const attr = this.getAttributes();
+          const href = (attr['data-href'] || '').trim();
+          if (!href) return html;
+          const target = attr['data-target'] ? ' target="' + attr['data-target'] + '" rel="noopener"' : '';
+          // <button ...>nội dung</button> → <a href ...>nội dung</a> (giữ class/id để giữ style)
+          return html.replace(/<button\b([^>]*)>([\s\S]*?)<\/button>/i, function (_, a, inner) {
+            a = a.replace(/\s*data-(?:href|target)="[^"]*"/g, '').replace(/\s*type="[^"]*"/g, '');
+            return '<a href="' + href + '"' + target + a + '>' + inner + '</a>';
+          });
+        },
+      },
+    });
+  }
+
+  // ───────── Cụm công cụ phải (zoom + thiết bị) ─────────
+  // Đặt trong 1 container cố định trên body để GrapesJS không xóa mất.
+  function getToolsBox() {
+    let box = document.getElementById('ldp-tools');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'ldp-tools';
+      box.className = 'ldp-tools';
+      document.body.appendChild(box);
+    }
+    return box;
+  }
+
+  // ───────── Zoom canvas (phóng to/thu nhỏ + tự fit) ─────────
+  // Desktop có bề rộng thiết kế cố định → tự thu nhỏ cho vừa khung canvas.
+  const DEVICE_W = { Desktop: 1280, Mobile: 375 };  // cả 2 device đều có khung cố định
+  let zoomLevel = 100;
+
+  function applyZoom(z) {
+    zoomLevel = Math.max(20, Math.min(300, Math.round(z) || 100));
+    try {
+      editor.Canvas.setZoom(zoomLevel);   // để GrapesJS tự căn giữa frame theo zoom
+    } catch (e) {}
+    const inp = document.querySelector('.ldp-zoom-input');
+    if (inp && document.activeElement !== inp) inp.value = zoomLevel;
+  }
+  function fitCanvas() {
+    const cv = document.getElementById('gjs');
+    if (!cv || cv.clientWidth < 50) return;
+    const dev = editor.getDevice();
+    const frameW = DEVICE_W[dev];
+    if (!frameW) { applyZoom(100); return; }
+    const avail = cv.clientWidth - 24;              // lề mỏng → khung bám sát 2 panel
+    let z = (avail / frameW) * 100;
+    // Desktop: lấp đầy bề ngang canvas (cho phép phóng to >100% trên màn rộng).
+    // Mobile: tối đa 100% (không phóng khung 375px to quá).
+    if (dev === 'Mobile') z = Math.min(100, z);
+    applyZoom(z);
+  }
+  function buildZoomControl() {
+    const box = getToolsBox();
+    if (box.querySelector('.ldp-zoom')) return;
+    const zc = document.createElement('div');
+    zc.className = 'ldp-zoom';
+    zc.innerHTML =
+      '<button class="ldp-zoom-btn" type="button" data-z="out" title="Thu nhỏ">−</button>' +
+      '<input class="ldp-zoom-input" type="text" value="100" title="Nhập % rồi Enter" />' +
+      '<span class="ldp-zoom-pct">%</span>' +
+      '<button class="ldp-zoom-btn" type="button" data-z="in" title="Phóng to">+</button>' +
+      '<button class="ldp-zoom-btn ldp-zoom-fit" type="button" data-z="fit" title="Vừa khung canvas">⤢</button>';
+    box.insertBefore(zc, box.firstChild);          // zoom đứng trước dropdown thiết bị
+    zc.querySelector('[data-z="out"]').addEventListener('click', () => applyZoom(zoomLevel - 10));
+    zc.querySelector('[data-z="in"]').addEventListener('click', () => applyZoom(zoomLevel + 10));
+    zc.querySelector('[data-z="fit"]').addEventListener('click', fitCanvas);
+    const inp = zc.querySelector('.ldp-zoom-input');
+    const commit = () => applyZoom(parseInt(inp.value, 10));
+    inp.addEventListener('change', commit);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { commit(); inp.blur(); } });
+  }
+  buildZoomControl();
+  editor.on('load', () => { buildZoomControl(); setTimeout(fitCanvas, 300); });
+  editor.on('canvas:frame:load', () => setTimeout(fitCanvas, 150));
+  editor.on('change:device', () => setTimeout(fitCanvas, 80));   // đổi thiết bị → fit lại
+  let _rzT;
+  window.addEventListener('resize', () => { clearTimeout(_rzT); _rzT = setTimeout(fitCanvas, 200); });
+
+  // ───────── Thu gọn / mở lại panel Blocks ─────────
+  const btnCollapse = document.getElementById('btn-collapse-blocks');
+  const btnExpand   = document.getElementById('btn-expand-blocks');
+  function toggleBlocks(collapsed) {
+    document.body.classList.toggle('ldp-collapsed', collapsed);
+    // canvas đổi kích thước → fit lại + báo GrapesJS resize
+    setTimeout(() => { window.dispatchEvent(new Event('resize')); fitCanvas(); }, 220);
+  }
+  if (btnCollapse) btnCollapse.addEventListener('click', () => toggleBlocks(true));
+  if (btnExpand)   btnExpand.addEventListener('click', () => toggleBlocks(false));
+
+  // ───────── Kéo chỉnh độ rộng panel 2 bên ─────────
+  document.querySelectorAll('.ldp-resizer').forEach((rz) => {
+    rz.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const side = rz.dataset.side;
+      const varName = side === 'left' ? '--ldp-left-w' : '--ldp-right-w';
+      const startX = e.clientX;
+      const startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue(varName), 10) || 184;
+      rz.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      function onMove(ev) {
+        const dx = ev.clientX - startX;
+        let w = side === 'left' ? startW + dx : startW - dx;
+        w = Math.max(150, Math.min(340, w));   // giới hạn để không vỡ canvas giữa
+        document.documentElement.style.setProperty(varName, w + 'px');
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        rz.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        fitCanvas();
+        window.dispatchEvent(new Event('resize'));
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+
+  // --- Dropdown chuyển thiết bị (tạo bằng JS; chạy lại sau 'load' nếu bị xóa) ---
+  function buildDeviceDropdown() {
+    if (document.querySelector('.ldp-dev-dd')) return;  // tránh tạo trùng
+
+    const DEV_ICON = {
+      Desktop: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 2H3a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h7v2H7v2h10v-2h-3v-2h7a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zm-1 12H4V4h16v10z"/></svg>',
+      Tablet:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 1H5a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm-7 21a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm7-4H5V4h14v14z"/></svg>',
+      Mobile:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm-5 21a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm5-4H7V4h10v14z"/></svg>',
+    };
+    const DEV_SUB = { Desktop: '1280px', Mobile: '375px' };
+    const list = ['Desktop', 'Mobile'];
+
+    const dd = document.createElement('div');
+    dd.className = 'ldp-dev-dd';
+    dd.innerHTML =
+      '<button class="ldp-dev-toggle" type="button" title="Chọn thiết bị xem trước">' +
+        '<span class="dd-icon">' + DEV_ICON.Desktop + '</span>' +
+        '<span class="dd-name">Desktop</span>' +
+        '<svg class="caret" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>' +
+      '</button>' +
+      '<div class="ldp-dev-menu">' +
+        list.map((d) =>
+          '<button type="button" data-device="' + d + '">' + DEV_ICON[d] +
+          '<span>' + d + '</span><span class="dd-sub">' + DEV_SUB[d] + '</span></button>'
+        ).join('') +
+      '</div>';
+    getToolsBox().appendChild(dd);
+
+    const toggle = dd.querySelector('.ldp-dev-toggle');
+    const menu   = dd.querySelector('.ldp-dev-menu');
+    const nameEl = dd.querySelector('.dd-name');
+    const iconEl = dd.querySelector('.dd-icon');
+
+    function setActive(name) {
+      nameEl.textContent = name;
+      iconEl.innerHTML   = DEV_ICON[name];
+      menu.querySelectorAll('button').forEach((b) =>
+        b.classList.toggle('active', b.dataset.device === name));
+      editor.setDevice(name);
+    }
+
+    toggle.addEventListener('click', (e) => { e.stopPropagation(); dd.classList.toggle('open'); });
+    menu.querySelectorAll('button').forEach((b) =>
+      b.addEventListener('click', () => { setActive(b.dataset.device); dd.classList.remove('open'); }));
+    document.addEventListener('click', () => dd.classList.remove('open'));
+
+    // Đồng bộ nếu thiết bị đổi từ nơi khác
+    editor.on('change:device', () => {
+      const d = editor.getDevice();
+      if (d && d !== nameEl.textContent) setActive(d);
+    });
+
+    // Trạng thái ban đầu: ép về đúng thiết bị hiện tại + áp lại chiều rộng frame
+    setActive(editor.getDevice() || 'Desktop');
+  }
+  buildDeviceDropdown();                       // tạo ngay sau init
+  editor.on('load', buildDeviceDropdown);      // và sau khi load xong (phòng bị xóa)
+
+  // ───────── Gỡ srcset/sizes khỏi ảnh để src (ảnh mới chọn) có hiệu lực ─────────
+  // Ảnh import thường còn srcset responsive trỏ tới URL gốc → đè src mới → ảnh không hiện.
+  function stripImgSrcset() {
+    try {
+      editor.getWrapper().find('img').forEach((img) => img.removeAttributes(['srcset', 'sizes']));
+    } catch (e) {}
+  }
+  editor.on('load', () => setTimeout(stripImgSrcset, 200));
+  // Khi chọn ảnh từ Asset Manager → gỡ srcset của ảnh đang sửa
+  editor.on('asset:select', () => {
+    const sel = editor.getSelected();
+    if (sel && sel.removeAttributes) sel.removeAttributes(['srcset', 'sizes']);
+  });
+
+  // ───────── Tab panel phải: Styles / Settings / Layers ─────────
+  const tabBtns = document.querySelectorAll('.ldp-tabs button');
+  const panes = {
+    styles: document.getElementById('pane-styles'),
+    traits: document.getElementById('pane-traits'),
+    layers: document.getElementById('pane-layers'),
+  };
+  function activateTab(name) {
+    tabBtns.forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    Object.entries(panes).forEach(([k, el]) => { el.style.display = (k === name) ? '' : 'none'; });
+  }
+  tabBtns.forEach((b) => b.addEventListener('click', () => activateTab(b.dataset.tab)));
+  // Chọn 1 element → tự nhảy sang tab Styles
+  editor.on('component:selected', () => activateTab('styles'));
+
+  // ───────── Trait "Nội dung": sửa text của mọi component text / nút ─────────
+  editor.TraitManager.addType('text-content', {
+    createInput() {
+      const el = document.createElement('textarea');
+      el.className = 'ldp-tc-input';
+      el.rows = 4;
+      el.placeholder = 'Nhập nội dung…';
+      return el;
+    },
+    // Áp dụng khi rời ô (sự kiện change) — gõ giữa chừng không bị mất con trỏ
+    onEvent({ elInput, component }) {
+      component.components((elInput.value || '').replace(/\n/g, '<br>'));
+    },
+    // Hiển thị text hiện tại của component vào ô
+    onUpdate({ elInput, component }) {
+      let txt = '';
+      const el = component.getEl && component.getEl();
+      if (el) txt = el.innerText;
+      else txt = (component.get('content') || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+      if (elInput.value !== txt) elInput.value = txt;
+    },
+  });
+
+  // Tự gắn trait "Nội dung" cho component dạng text / nút khi được chọn
+  const TEXT_TYPES = ['text', 'link', 'button'];
+  const NON_TEXT_TAGS = ['img', 'video', 'iframe', 'svg', 'input', 'select', 'textarea', 'hr', 'br', 'source', 'picture', 'audio', 'canvas'];
+  function isTextEditable(cmp) {
+    if (!cmp) return false;
+    if (TEXT_TYPES.includes(cmp.get('type'))) return true;
+    const tag = (cmp.get('tagName') || '').toLowerCase();
+    if (NON_TEXT_TAGS.includes(tag)) return false;
+    const el = cmp.getEl && cmp.getEl();
+    if (!el) return false;
+    // chỉ nhận element "lá" chứa text (không có element con ngoài <br>)
+    const hasElChild = Array.from(el.children).some((c) => c.tagName !== 'BR');
+    return !hasElChild && el.textContent.trim().length > 0;
+  }
+  editor.on('component:selected', (cmp) => {
+    if (!isTextEditable(cmp)) return;
+    const traits = cmp.get('traits');
+    if (traits && !traits.where({ name: 'ldp-content' }).length) {
+      cmp.addTrait({ type: 'text-content', name: 'ldp-content', label: 'Nội dung' }, { at: 0 });
+    }
+  });
+
+  // ───────── Trait "Ẩn phần tử" theo thiết bị (Desktop / Mobile riêng) ─────────
+  // Ẩn = gắn thuộc tính data-ldp-hide-d (desktop) / data-ldp-hide-m (mobile) lên
+  // phần tử. Trang public ẩn thật qua CSS từng thiết bị (xem server/ldp-render.js).
+  // Trong editor phần tử KHÔNG biến mất mà chỉ mờ + viền nét đứt để vẫn chọn lại
+  // được (tránh tình huống ẩn xong không tìm thấy để bật lại).
+  const hideAttrFor = () => (editor.getDevice() === 'Mobile' ? 'data-ldp-hide-m' : 'data-ldp-hide-d');
+  const isHiddenOnDevice = (cmp) => !!(cmp && cmp.getAttributes()[hideAttrFor()] !== undefined);
+  function setHiddenOnDevice(cmp, hidden) {
+    if (!cmp) return;
+    const a = hideAttrFor();
+    if (hidden) cmp.addAttributes({ [a]: '' });
+    else        cmp.removeAttributes(a);
+  }
+
+  editor.TraitManager.addType('ldp-visibility', {
+    createInput() {
+      const wrap = document.createElement('label');
+      wrap.className = 'ldp-vis-toggle';
+      wrap.innerHTML =
+        '<input type="checkbox" class="ldp-vis-cb"/>' +
+        '<span class="ldp-vis-slider"></span>' +
+        '<span class="ldp-vis-hint"></span>';
+      wrap.querySelector('.ldp-vis-cb').addEventListener('change', (e) => {
+        setHiddenOnDevice(editor.getSelected(), e.target.checked);
+      });
+      return wrap;
+    },
+    onUpdate({ elInput, component }) {
+      const cb = elInput.querySelector('.ldp-vis-cb');
+      const hint = elInput.querySelector('.ldp-vis-hint');
+      if (cb) cb.checked = isHiddenOnDevice(component);
+      if (hint) hint.textContent = 'trên ' + (editor.getDevice() === 'Mobile' ? 'Mobile' : 'Desktop');
+    },
+  });
+
+  // Gắn trait cho mọi component được chọn (trừ wrapper/body)
+  editor.on('component:selected', (cmp) => {
+    if (!cmp || cmp.get('type') === 'wrapper') return;
+    const traits = cmp.get('traits');
+    if (traits && !traits.where({ name: 'ldp-hidden' }).length) {
+      cmp.addTrait({ type: 'ldp-visibility', name: 'ldp-hidden', label: 'Ẩn phần tử' }, { at: 0 });
+    }
+  });
+
+  // Đổi thiết bị → cập nhật lại trạng thái công tắc (vì hide theo từng thiết bị)
+  editor.on('change:device', () => {
+    const cmp = editor.getSelected();
+    const wrap = document.querySelector('#traits .ldp-vis-toggle');
+    if (!cmp || !wrap) return;
+    const cb = wrap.querySelector('.ldp-vis-cb');
+    const hint = wrap.querySelector('.ldp-vis-hint');
+    if (cb) cb.checked = isHiddenOnDevice(cmp);
+    if (hint) hint.textContent = 'trên ' + (editor.getDevice() === 'Mobile' ? 'Mobile' : 'Desktop');
+  });
+
+  // CSS chỉ-trong-editor (KHÔNG vào getCss / trang public):
+  //  1) Hiện phần tử animation-cuộn: các thư viện (AOS…) đặt trạng thái ban đầu
+  //     opacity:0 và chỉ hiện khi JS thêm class lúc cuộn — JS đó không chạy trong
+  //     canvas nên nội dung "vô hình". Ép về trạng thái đã-hiện để còn sửa được.
+  //  2) Phần tử bị ẩn vẫn hiện (mờ + viền) để chọn/bật lại — theo đúng thiết bị.
+  // Đặt reveal TRƯỚC rule ẩn-mờ để phần tử vừa-animation-vừa-ẩn vẫn hiển thị mờ.
+  const ANIM_REVEAL_SELECTORS = [
+    '[data-aos]', '[data-aos-delay]',           // AOS (phổ biến nhất)
+    '[data-animate]', '[data-anim]', '[data-sr]',
+    '.aos-init', '.wow', '.reveal', '.animate-on-scroll', '.scroll-animate',
+  ].join(',');
+  function injectCanvasEditorStyle() {
+    try {
+      const doc = editor.Canvas.getDocument();
+      if (!doc || !doc.head || doc.getElementById('ldp-editor-style')) return;
+      const st = doc.createElement('style');
+      st.id = 'ldp-editor-style';
+      st.textContent =
+        // 1) reveal phần tử animation-ẩn (hiện NGAY, không chạy transition trong editor)
+        ANIM_REVEAL_SELECTORS + '{opacity:1!important;transform:none!important;visibility:visible!important;animation:none!important;transition:none!important}' +
+        // 2) phần tử bị ẩn theo thiết bị → mờ + viền (đặt SAU để thắng reveal)
+        '@media (min-width:576px){[data-ldp-hide-d]{opacity:.4!important;outline:1.5px dashed #f59e0b!important;outline-offset:-1px!important}}' +
+        '@media (max-width:575px){[data-ldp-hide-m]{opacity:.4!important;outline:1.5px dashed #f59e0b!important;outline-offset:-1px!important}}';
+      doc.head.appendChild(st);
+    } catch (e) { /* canvas chưa sẵn sàng */ }
+  }
+  editor.on('canvas:frame:load', injectCanvasEditorStyle);
+  editor.on('load', () => setTimeout(injectCanvasEditorStyle, 200));
+
+  // ───────── Đồng bộ CSS đầy đủ vào canvas iframe ─────────
+  // GrapesJS lọc media query theo thiết bị nên layout responsive import vào hiển thị sai
+  // trên canvas. Chèn nguyên getCss() (giống trang public) để canvas render đúng như thật.
+  let cssSyncTimer;
+  function syncCanvasFullCss() {
+    try {
+      const doc = editor.Canvas.getDocument();
+      if (!doc || !doc.head) return;
+      // Gỡ style cũ rồi gắn lại ở CUỐI <head> → luôn thắng cascade so với style
+      // (đã bị lọc media theo thiết bị) mà GrapesJS tự render.
+      const old = doc.getElementById('ldp-full-css');
+      if (old) old.remove();
+      const st = doc.createElement('style');
+      st.id = 'ldp-full-css';
+      st.textContent = editor.getCss() || '';
+      doc.head.appendChild(st);
+    } catch (e) { /* canvas chưa sẵn sàng */ }
+  }
+  function scheduleCssSync() {
+    clearTimeout(cssSyncTimer);
+    cssSyncTimer = setTimeout(syncCanvasFullCss, 120);
+  }
+  editor.on('load', syncCanvasFullCss);
+  editor.on('canvas:frame:load', syncCanvasFullCss);
+  editor.on('storage:end:load', scheduleCssSync);
+  editor.on('update', scheduleCssSync);
+  editor.on('change:device', () => setTimeout(syncCanvasFullCss, 120));  // đổi device → gắn lại CSS đầy đủ cuối head
+
+  // ───────── Cho phép bấm chuyển tab NGAY trong canvas (để sửa nội dung từng tab) ─────────
+  // Dùng listener ủy quyền ở capture-phase trên document của iframe → bền vững qua
+  // re-render, chạy TRƯỚC GrapesJS, và KHÔNG reset tab khi đang sửa. Chỉ đổi class
+  // is-active ở runtime (không ghi vào model nên không làm bẩn / không lưu).
+  // Hỗ trợ các mẫu tab thông dụng:
+  //   • TỔNG QUÁT: bất kỳ data-*tab ↔ data-*panel (theo chỉ số) — tự suy panel từ tab
+  //     (tab→panel ở cuối tên). Bao: data-sus-toptab/toppanel, data-sus-subtab/subpanel,
+  //     data-sus-tab/panel, data-tab/panel… không cần biết trước tên cụ thể.
+  //   • data-mbjr-tab / data-mbjr-slide + [data-mbjr-fill]  (slider theo chỉ số)
+  //   • data-l1 / data-l2 + *-panel  (theo key)
+  //   • [role=tab] + aria-controls  (chuẩn ARIA: đổi is-active & hidden)
+  function injectCanvasJs() {
+    try {
+      const doc = editor.Canvas.getDocument();
+      if (!doc || !doc.body) return;
+      if (doc.getElementById('ldp-canvas-tabs')) return;   // chỉ chèn 1 lần
+      const s = doc.createElement('script');
+      s.id = 'ldp-canvas-tabs';
+      s.textContent =
+        "if(!document.__ldpTabs){document.__ldpTabs=1;" +
+        "function ldpTog(tabs,panels,clicked){var i=tabs.indexOf(clicked);" +
+        "tabs.forEach(function(x,k){x.classList.toggle('is-active',k===i)});" +
+        "panels.forEach(function(x,k){x.classList.toggle('is-active',k===i)});}" +
+        "document.addEventListener('click',function(e){var t=e.target;if(!t||!t.closest)return;" +
+        // data-mbjr (slider: slide + thanh tiến trình) — xử lý trước vì panel của nó là 'slide'
+        "var mb=t.closest('[data-mbjr-tab]');" +
+        "if(mb){var sec=mb.closest('[data-mbjr]')||document,Tt=[].slice.call(sec.querySelectorAll('[data-mbjr-tab]')),i=Tt.indexOf(mb);" +
+        "Tt.forEach(function(x,k){x.classList.toggle('is-active',k===i)});" +
+        "[].slice.call(sec.querySelectorAll('[data-mbjr-slide]')).forEach(function(x,k){x.classList.toggle('is-active',k===i)});" +
+        "var f=sec.querySelector('[data-mbjr-fill]');if(f&&Tt.length)f.style.width=((i+1)/Tt.length*100)+'%';return;}" +
+        // TỔNG QUÁT: tìm phần tử mang thuộc tính data-*tab gần nhất, suy ra data-*panel
+        "var el=t,tabEl=null,tabAttr=null;" +
+        "while(el&&el!==document){if(el.getAttributeNames){var ns=el.getAttributeNames();for(var n=0;n<ns.length;n++){if(/^data-[\\w-]*tab$/.test(ns[n])){tabEl=el;tabAttr=ns[n];break;}}}if(tabEl)break;el=el.parentElement;}" +
+        "if(tabEl){var panelAttr=tabAttr.replace(/tab$/,'panel');" +
+        "var root=tabEl.parentElement;while(root&&root!==document&&!root.querySelector('['+panelAttr+']'))root=root.parentElement;root=root||document;" +
+        "ldpTog([].slice.call(root.querySelectorAll('['+tabAttr+']')),[].slice.call(root.querySelectorAll('['+panelAttr+']')),tabEl);return;}" +
+        // data-l1 / data-l2 (theo key)
+        "var a=t.closest('[data-l1]');" +
+        "if(a){var k=a.getAttribute('data-l1');" +
+        "(a.closest('ul,[role=tablist]')||document).querySelectorAll('[data-l1]').forEach(function(b){b.classList.toggle('is-active',b===a)});" +
+        "document.querySelectorAll('[data-l1-panel]').forEach(function(p){p.classList.toggle('is-active',p.getAttribute('data-l1-panel')===k)});return;}" +
+        "var c=t.closest('[data-l2]');" +
+        "if(c){var k2=c.getAttribute('data-l2');" +
+        "(c.closest('ul,[role=tablist]')||document).querySelectorAll('[data-l2]').forEach(function(b){b.classList.toggle('is-active',b===c)});" +
+        "document.querySelectorAll('[data-l2-panel]').forEach(function(p){p.classList.toggle('is-active',p.getAttribute('data-l2-panel')===k2)});return;}" +
+        // [role=tab] + aria-controls (chuẩn ARIA)
+        "var rt=t.closest('[role=tab]');" +
+        "if(rt){var tl=rt.closest('[role=tablist]')||document;" +
+        "[].slice.call(tl.querySelectorAll('[role=tab]')).forEach(function(b){var on=b===rt;b.classList.toggle('is-active',on);b.setAttribute('aria-selected',on?'true':'false');" +
+        "var pid=b.getAttribute('aria-controls');if(pid){var pe=document.getElementById(pid);if(pe){pe.classList.toggle('is-active',on);pe.hidden=!on;}}});return;}" +
+        "},true);}";
+      doc.body.appendChild(s);
+    } catch (e) { /* canvas chưa sẵn sàng */ }
+  }
+  editor.on('canvas:frame:load', injectCanvasJs);
+  editor.on('load', () => setTimeout(injectCanvasJs, 200));
+  editor.on('storage:end:load', () => setTimeout(injectCanvasJs, 200));
+
+  // --- Cập nhật metadata + tiêu đề sau khi load ---
+  function syncPageMeta() {
+    fetch(`/api/pages/${pageId}`)
+      .then(r => r.json())
+      .then(p => {
+        pageMeta = { slug: p.slug, status: p.status };
+        document.title = `${p.name} — LDP Builder`;
+        const btn = editor.Panels.getButton('actions', 'btn-publish');
+        if (!btn) return;
+        const isPub = p.status === 'published';
+        btn.set('attributes', { title: isPub ? 'Unpublish (về Draft)' : 'Publish' });
+        requestAnimationFrame(() => {
+          const el = document.getElementById('btn-publish');
+          if (el) el.classList.toggle('is-published', isPub);
+        });
+      })
+      .catch(() => {});
+  }
+  editor.on('storage:end:load', syncPageMeta);
+
+  // --- Asset Manager: phản hồi upload ---
+  editor.on('asset:upload:start', () => showToast('Đang upload…', 'saving', 30000));
+  editor.on('asset:upload:error', (err) => {
+    showToast('✗ ' + ((err && (err.error || err.message)) || 'Upload thất bại'), 'error');
+  });
+  editor.on('asset:upload:response', (resp) => {
+    if (resp && resp.error) { showToast('✗ ' + resp.error, 'error'); return; }
+    const n = resp && Array.isArray(resp.data) ? resp.data.length : 0;
+    showToast(`✓ Upload ${n} ảnh thành công!`);
+  });
+
+  // --- Command: Lưu ---
+  editor.Commands.add('cmd-save', {
+    run: async (ed) => {
+      showToast('Đang lưu…', 'saving', 10000);
+      try {
+        await ed.store();
+        showToast('✓ Đã lưu thành công!', 'success');
+      } catch (e) {
+        showToast('✗ Lưu thất bại!', 'error');
+        console.error(e);
+      }
+    },
+  });
+
+  // --- Command: Publish / Unpublish ---
+  editor.Commands.add('cmd-publish', {
+    run: async () => {
+      const newStatus = pageMeta.status === 'published' ? 'draft' : 'published';
+      try {
+        const res = await fetch(`/api/pages/${pageId}`, {
+          method : 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body   : JSON.stringify({ status: newStatus }),
+        });
+        if (!res.ok) throw new Error('API error');
+        syncPageMeta();
+        showToast(newStatus === 'published' ? '🌐 Đã Publish!' : '✓ Đã chuyển về Draft', 'success');
+      } catch (e) {
+        showToast('✗ Thất bại: ' + e.message, 'error');
+      }
+    },
+  });
+
+  // --- Command: Mở URL public /p/:slug ---
+  editor.Commands.add('cmd-view-public', {
+    run: () => {
+      if (!pageMeta.slug) { showToast('Chưa có thông tin trang. Hãy lưu trước.', 'error'); return; }
+      window.open(`/p/${pageMeta.slug}`, '_blank');
+    },
+  });
+
+  // --- Command: Về trang Danh sách Landing Page (dashboard) ---
+  editor.Commands.add('cmd-home', {
+    run: () => {
+      const dirty = editor.getDirtyCount ? editor.getDirtyCount() : 0;
+      if (dirty && !window.confirm('Có thay đổi chưa lưu. Rời khỏi trang Editor?\n(Bấm Hủy để ở lại và Lưu trước.)')) return;
+      window.location.href = '/';
+    },
+  });
+
+  // --- Command gộp: Mã trang (Xem / Sửa / Import / Export ZIP) ---
+  // Áp dụng code vào trang: tách <style>, <script> (giữ JS cho trang public),
+  // bỏ srcset/sizes (tránh đè src), bóc phần <body> nếu dán cả tài liệu.
+  // Trả về true nếu có <script> để báo cho người dùng.
+  function applyPageCode(ed, html, css) {
+    const styleBlocks = [];
+    const scriptBlocks = [];
+    let body = html || '';
+    body = body.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, c) => { styleBlocks.push(c); return ''; });
+    body = body.replace(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi, (_, c) => { scriptBlocks.push(c); return ''; });
+    body = body.replace(/<script\b[^>]*\bsrc=[^>]*>\s*<\/script>/gi, '');
+    const bodyMatch = body.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) body = bodyMatch[1];
+    body = body.replace(/<\/?(?:html|head|body|!doctype)[^>]*>/gi, '').trim();
+    body = body.replace(/\s(?:srcset|sizes)="[^"]*"/gi, '');
+
+    const finalCss = [styleBlocks.join('\n'), css || ''].filter(s => s.trim()).join('\n');
+    ed.Css.clear();
+    ed.setComponents(body);
+    if (finalCss) ed.addStyle(finalCss);
+    // Chỉ cập nhật JS khi code mới có <script> (tránh xoá JS đã import khi chỉ sửa HTML)
+    if (scriptBlocks.length) currentJs = scriptBlocks.join('\n');
+    // Sau khi import: bảo đảm canvas còn tương tác được (tab/click) + style editor + CSS đầy đủ
+    setTimeout(() => { injectCanvasJs(); injectCanvasEditorStyle(); syncCanvasFullCss(); }, 60);
+    return scriptBlocks.length > 0;
+  }
+
+  // Format HTML cho dễ đọc: xuống dòng + thụt lề theo độ sâu lồng thẻ
+  function formatHtml(html) {
+    if (!html || !html.trim()) return '';
+    const VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+    const xml = html.replace(/>\s*</g, '>\n<');
+    const pad = (n) => '  '.repeat(Math.max(0, n));
+    let indent = 0;
+    const out = [];
+    xml.split('\n').forEach((raw) => {
+      const line = raw.trim();
+      if (!line) return;
+      if (/^<\/\w/.test(line)) {                 // thẻ đóng
+        indent = Math.max(0, indent - 1);
+        out.push(pad(indent) + line);
+      } else if (/^<\w/.test(line)) {            // thẻ mở
+        const m = line.match(/^<([\w-]+)/);
+        const tag = m ? m[1].toLowerCase() : '';
+        out.push(pad(indent) + line);
+        const selfClose = /\/>\s*$/.test(line);
+        const sameClose = new RegExp('</' + tag + '\\s*>\\s*$', 'i').test(line);
+        if (!VOID.has(tag) && !selfClose && !sameClose) indent++;
+      } else {                                   // text / comment
+        out.push(pad(indent) + line);
+      }
+    });
+    return out.join('\n');
+  }
+
+  // Format CSS cho dễ đọc: mỗi khai báo 1 dòng, thụt lề theo độ sâu (kể cả @media)
+  function formatCss(css) {
+    if (!css || !css.trim()) return '';
+    const out = [];
+    let depth = 0, buf = '';
+    const pad = () => '  '.repeat(Math.max(0, depth));
+    for (let i = 0; i < css.length; i++) {
+      const ch = css[i];
+      if (ch === '{') {
+        out.push(pad() + buf.trim() + ' {'); buf = ''; depth++;
+      } else if (ch === '}') {
+        if (buf.trim()) { out.push(pad() + buf.trim() + ';'); }
+        buf = ''; depth = Math.max(0, depth - 1);
+        out.push(pad() + '}');
+      } else if (ch === ';') {
+        if (buf.trim()) out.push(pad() + buf.trim() + ';');
+        buf = '';
+      } else { buf += ch; }
+    }
+    if (buf.trim()) out.push(buf.trim());
+    // 1 dòng trống sau mỗi block ở cấp ngoài cùng
+    return out.join('\n').replace(/^\}$/gm, '}\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  // Dựng nội dung "gộp chung" đã format
+  const fmtMerged = (html, css) =>
+    (css && css.trim() ? '<style>\n' + formatCss(css) + '\n</style>\n\n' : '') + formatHtml(html);
+
+  editor.Commands.add('cmd-edit-code', {
+    run: (ed) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'ldp-ce';
+      wrap.innerHTML =
+        '<div class="ldp-ce-bar">' +
+          '<div class="ldp-ce-modes">' +
+            '<button type="button" class="ldp-ce-mode active" data-mode="split">Tách HTML / CSS</button>' +
+            '<button type="button" class="ldp-ce-mode" data-mode="merge">Gộp chung</button>' +
+          '</div>' +
+          '<div class="ldp-ce-acts">' +
+            '<button type="button" class="ldp-ce-zip">Export ZIP</button>' +
+            '<button type="button" class="ldp-ce-apply">Áp dụng vào trang</button>' +
+          '</div>' +
+        '</div>' +
+        '<p class="ldp-ce-hint">Sửa trực tiếp hoặc dán code mới. Bấm <b>Áp dụng</b> sẽ <b>thay thế toàn bộ</b> nội dung trang. Thẻ &lt;script&gt; được giữ lại cho trang public.</p>' +
+        '<div class="ldp-ce-split">' +
+          '<div class="ldp-ce-col"><span>HTML</span><textarea class="ldp-ce-html" spellcheck="false" placeholder="<section class=&quot;hero&quot;>...</section>"></textarea></div>' +
+          '<div class="ldp-ce-col"><span>CSS</span><textarea class="ldp-ce-css" spellcheck="false" placeholder=".hero { padding: 60px; }"></textarea></div>' +
+        '</div>' +
+        '<div class="ldp-ce-merge" style="display:none"><span>HTML + CSS (gộp chung)</span><textarea class="ldp-ce-all" spellcheck="false"></textarea></div>';
+
+      const htmlTa = wrap.querySelector('.ldp-ce-html');
+      const cssTa  = wrap.querySelector('.ldp-ce-css');
+      const allTa  = wrap.querySelector('.ldp-ce-all');
+      const splitBox = wrap.querySelector('.ldp-ce-split');
+      const mergeBox = wrap.querySelector('.ldp-ce-merge');
+
+      const curHtml = ed.getHtml();
+      const curCss  = ed.getCss();
+      htmlTa.value = formatHtml(curHtml);
+      cssTa.value  = formatCss(curCss);
+      allTa.value  = fmtMerged(curHtml, curCss);
+
+      let mode = 'split';
+      wrap.querySelectorAll('.ldp-ce-mode').forEach(btn => btn.addEventListener('click', () => {
+        const m = btn.dataset.mode;
+        if (m === mode) return;
+        if (m === 'merge') {
+          allTa.value = fmtMerged(htmlTa.value, cssTa.value);
+        } else {
+          const styles = [];
+          const body = allTa.value.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, c) => { styles.push(c); return ''; });
+          htmlTa.value = formatHtml(body.trim());
+          cssTa.value  = formatCss(styles.join('\n').trim());
+        }
+        mode = m;
+        wrap.querySelectorAll('.ldp-ce-mode').forEach(x => x.classList.toggle('active', x.dataset.mode === mode));
+        splitBox.style.display = mode === 'split' ? '' : 'none';
+        mergeBox.style.display = mode === 'merge' ? '' : 'none';
+      }));
+
+      function doApply() {
+        const hasJs = (mode === 'merge')
+          ? applyPageCode(ed, allTa.value, '')
+          : applyPageCode(ed, htmlTa.value, cssTa.value);
+        return hasJs;
+      }
+
+      // Lấy lại code chuẩn từ trang rồi format đẹp vào ô đang hiển thị
+      function reformatFromPage() {
+        const h = ed.getHtml(), c = ed.getCss();
+        if (mode === 'merge') allTa.value = fmtMerged(h, c);
+        else { htmlTa.value = formatHtml(h); cssTa.value = formatCss(c); }
+      }
+
+      wrap.querySelector('.ldp-ce-apply').addEventListener('click', () => {
+        const hasJs = doApply();
+        reformatFromPage();   // tự format lại ngay sau khi áp dụng (giữ modal mở)
+        showToast(hasJs
+          ? '✓ Đã áp dụng & format! JS được giữ lại cho trang public.'
+          : '✓ Đã áp dụng & format lại code!', 'success', hasJs ? 4500 : 2800);
+      });
+
+      // Export ZIP: áp dụng code hiện tại rồi xuất file zip (index.html + css)
+      wrap.querySelector('.ldp-ce-zip').addEventListener('click', () => {
+        doApply();
+        ed.runCommand('gjs-export-zip');
+        showToast('✓ Đang tải file ZIP…', 'success', 2500);
+      });
+
+      ed.Modal.open({ title: 'Mã trang — Xem / Sửa / Import / Export ZIP', content: wrap });
+    },
+  });
+
+  // --- Phím tắt Ctrl+S / Cmd+S ---
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      editor.runCommand('cmd-save');
+    }
+  });
+}());
+</script>
+</body>
+</html>

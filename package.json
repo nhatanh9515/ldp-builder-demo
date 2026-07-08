@@ -1,0 +1,21 @@
+{
+  "name": "ldp-builder",
+  "version": "1.0.0",
+  "description": "Landing page builder dùng GrapesJS",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "dev": "node server/index.js",
+    "start": "node server/index.js",
+    "dev:watch": "nodemon --watch server --ext js,json server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "multer": "^2.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
