@@ -1126,22 +1126,115 @@
     },
   });
 
-  // --- Command: Publish / Unpublish ---
+  // --- Command: Publish (popup demo — cấu hình alias + SEO) ---
+  // Lưu ý: popup chỉ mang tính giao diện demo, các nút chưa gọi API thật.
   editor.Commands.add('cmd-publish', {
-    run: async () => {
-      const newStatus = pageMeta.status === 'published' ? 'draft' : 'published';
-      try {
-        const res = await fetch(`/api/pages/${pageId}`, {
-          method : 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body   : JSON.stringify({ status: newStatus }),
-        });
-        if (!res.ok) throw new Error('API error');
-        syncPageMeta();
-        showToast(newStatus === 'published' ? '🌐 Đã Publish!' : '✓ Đã chuyển về Draft', 'success');
-      } catch (e) {
-        showToast('✗ Thất bại: ' + e.message, 'error');
+    run: (ed) => {
+      function imgPicker(icon) {
+        return '<div class="ldp-pub-img">' +
+          '<div class="ldp-pub-thumb">' + icon + '</div>' +
+          '<div class="ldp-pub-img-r">' +
+            '<input type="text" class="ldp-pub-imgurl" spellcheck="false" placeholder="https://… hoặc /uploads/…">' +
+            '<button type="button" class="ldp-pub-pick">Chọn ảnh</button>' +
+          '</div>' +
+        '</div>';
       }
+
+      const slug = (pageMeta && pageMeta.slug) || 'my-page';
+      const metaTitle = (document.title || '').replace(/\s*—\s*LDP Builder\s*$/, '');
+
+      const wrap = document.createElement('div');
+      wrap.className = 'ldp-pub';
+      wrap.innerHTML =
+        '<div class="ldp-pub-grid">' +
+          '<section class="ldp-pub-sec">' +
+            '<h4>🌐 Đường dẫn & Lập chỉ mục</h4>' +
+            '<label class="ldp-pub-lbl">Alias (subdomain)</label>' +
+            '<div class="ldp-pub-alias">' +
+              '<input type="text" class="ldp-pub-slug" spellcheck="false" placeholder="ten-trang">' +
+              '<span class="ldp-pub-domain">.ldp-builder.app</span>' +
+            '</div>' +
+            '<p class="ldp-pub-help">Trang sẽ truy cập tại <b class="ldp-pub-url"></b></p>' +
+            '<label class="ldp-pub-lbl">Lập chỉ mục công cụ tìm kiếm</label>' +
+            '<div class="ldp-pub-seg">' +
+              '<button type="button" data-val="index" class="active">Cho phép index</button>' +
+              '<button type="button" data-val="noindex">Noindex</button>' +
+            '</div>' +
+            '<label class="ldp-pub-lbl">Canonical URL</label>' +
+            '<input type="text" class="ldp-pub-canonical" spellcheck="false" placeholder="https://ldp-builder.app/' + slug + '">' +
+          '</section>' +
+          '<section class="ldp-pub-sec">' +
+            '<h4>🔎 SEO &amp; Chia sẻ</h4>' +
+            '<label class="ldp-pub-lbl">Meta title</label>' +
+            '<input type="text" class="ldp-pub-mtitle" maxlength="70" placeholder="Tiêu đề hiển thị trên Google">' +
+            '<label class="ldp-pub-lbl">Meta description</label>' +
+            '<textarea class="ldp-pub-mdesc" maxlength="180" placeholder="Mô tả ngắn ~150–160 ký tự"></textarea>' +
+            '<label class="ldp-pub-lbl">Meta keywords</label>' +
+            '<input type="text" class="ldp-pub-mkw" placeholder="landing page, khuyến mãi, …">' +
+            '<label class="ldp-pub-lbl">Ảnh thumbnail (khi chia sẻ)</label>' +
+            imgPicker('🖼️') +
+            '<label class="ldp-pub-lbl">Favicon</label>' +
+            imgPicker('⭐') +
+          '</section>' +
+        '</div>' +
+        '<div class="ldp-pub-foot">' +
+          '<button type="button" class="ldp-pub-save">Lưu thông tin</button>' +
+          '<button type="button" class="ldp-pub-go">Xuất bản</button>' +
+        '</div>';
+
+      // Prefill + đồng bộ URL xem trước theo alias
+      const slugInput = wrap.querySelector('.ldp-pub-slug');
+      const urlEcho   = wrap.querySelector('.ldp-pub-url');
+      slugInput.value = slug;
+      wrap.querySelector('.ldp-pub-mtitle').value = metaTitle;
+      const updateUrl = () => {
+        const s = slugInput.value.trim() || 'ten-trang';
+        urlEcho.textContent = 'https://' + s + '.ldp-builder.app';
+      };
+      slugInput.addEventListener('input', updateUrl);
+      updateUrl();
+
+      // Nút gạt index / noindex
+      const seg = wrap.querySelector('.ldp-pub-seg');
+      seg.addEventListener('click', (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        seg.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+      });
+
+      // Bộ chọn ảnh: gõ URL hoặc mở Asset Manager để chọn
+      wrap.querySelectorAll('.ldp-pub-img').forEach((box) => {
+        const inp   = box.querySelector('.ldp-pub-imgurl');
+        const thumb = box.querySelector('.ldp-pub-thumb');
+        const icon  = thumb.textContent;
+        const paint = () => {
+          const v = inp.value.trim();
+          if (v) { thumb.style.backgroundImage = 'url("' + v + '")'; thumb.textContent = ''; }
+          else   { thumb.style.backgroundImage = ''; thumb.textContent = icon; }
+        };
+        inp.addEventListener('input', paint);
+        box.querySelector('.ldp-pub-pick').addEventListener('click', () => {
+          ed.AssetManager.open({
+            types: ['image'],
+            select(asset, complete) {
+              inp.value = (asset.getSrc && asset.getSrc()) || (asset.get && asset.get('src')) || '';
+              paint();
+              if (complete) ed.AssetManager.close();
+            },
+          });
+        });
+      });
+
+      // Nút chân popup (demo)
+      wrap.querySelector('.ldp-pub-save').addEventListener('click', () => {
+        showToast('✓ Đã lưu thông tin publish (demo)', 'success');
+      });
+      wrap.querySelector('.ldp-pub-go').addEventListener('click', () => {
+        const s = slugInput.value.trim() || 'ten-trang';
+        showToast('🌐 Đã xuất bản: ' + s + '.ldp-builder.app (demo)', 'success', 3500);
+        ed.Modal.close();
+      });
+
+      ed.Modal.open({ title: 'Xuất bản trang', content: wrap });
     },
   });
 

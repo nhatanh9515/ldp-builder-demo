@@ -217,6 +217,87 @@
 }
 .ldp-ce textarea:focus { outline: none; border-color: var(--mb-blue); background: #fff; }
 
+/* Popup "Xuất bản" — cấu hình alias + SEO (demo) */
+.gjs-mdl-dialog:has(.ldp-pub) { max-width: 860px; width: 92%; }
+.ldp-pub { font-family: var(--mb-font); color: var(--mb-navy); }
+.ldp-pub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.ldp-pub-sec h4 {
+  margin: 0 0 4px; font: 700 14px var(--mb-font); color: var(--mb-navy);
+}
+.ldp-pub-lbl {
+  display: block; font: 600 12px var(--mb-font); color: var(--mb-navy); margin: 14px 0 6px;
+}
+.ldp-pub input[type=text], .ldp-pub textarea {
+  width: 100%; box-sizing: border-box; padding: 9px 12px;
+  border: 1px solid var(--mb-border); border-radius: var(--mb-radius-sm);
+  font: 13px/1.5 var(--mb-font); color: var(--mb-navy); background: #fbfcfe;
+}
+.ldp-pub input[type=text]:focus, .ldp-pub textarea:focus {
+  outline: none; border-color: var(--mb-blue); background: #fff;
+}
+.ldp-pub textarea { resize: vertical; min-height: 62px; }
+.ldp-pub-help { margin: 6px 0 0; font: 11px/1.5 var(--mb-font); color: var(--mb-ink-soft); }
+.ldp-pub-help b { color: var(--mb-blue); font-weight: 600; }
+/* Ô alias có hậu tố domain */
+.ldp-pub-alias {
+  display: flex; align-items: stretch; background: #fbfcfe;
+  border: 1px solid var(--mb-border); border-radius: var(--mb-radius-sm); overflow: hidden;
+}
+.ldp-pub-alias:focus-within { border-color: var(--mb-blue); background: #fff; }
+.ldp-pub-alias input {
+  flex: 1; min-width: 0; border: none !important; background: transparent !important;
+  padding: 9px 12px; font: 13px/1.5 var(--mb-font); color: var(--mb-navy);
+}
+.ldp-pub-alias input:focus { outline: none; }
+.ldp-pub-domain {
+  display: flex; align-items: center; padding: 0 12px; white-space: nowrap;
+  background: var(--mb-blue-50); color: var(--mb-blue);
+  font: 600 12px var(--mb-font); border-left: 1px solid var(--mb-border);
+}
+/* Nút gạt index / noindex */
+.ldp-pub-seg {
+  display: inline-flex; border: 1px solid var(--mb-border);
+  border-radius: var(--mb-radius-pill); overflow: hidden;
+}
+.ldp-pub-seg button {
+  padding: 8px 16px; border: none; background: #fff; cursor: pointer;
+  color: var(--mb-navy); font: 600 12px var(--mb-font); transition: background .15s, color .15s;
+}
+.ldp-pub-seg button + button { border-left: 1px solid var(--mb-border); }
+.ldp-pub-seg button.active { background: var(--mb-blue); color: #fff; }
+/* Bộ chọn ảnh (thumbnail / favicon) */
+.ldp-pub-img { display: flex; gap: 10px; align-items: stretch; }
+.ldp-pub-thumb {
+  width: 54px; height: 54px; flex: 0 0 54px; border-radius: var(--mb-radius-sm);
+  border: 1px dashed var(--mb-border); background: #f5f7fa center/cover no-repeat;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--mb-ink-soft); font-size: 20px;
+}
+.ldp-pub-img-r { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ldp-pub-pick {
+  align-self: flex-start; padding: 6px 14px; border-radius: var(--mb-radius-pill);
+  border: 1.5px solid var(--mb-blue); background: #fff; color: var(--mb-blue);
+  font: 600 12px var(--mb-font); cursor: pointer;
+}
+.ldp-pub-pick:hover { background: var(--mb-blue-50); }
+/* Chân popup */
+.ldp-pub-foot {
+  display: flex; justify-content: flex-end; gap: 12px;
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--mb-border);
+}
+.ldp-pub-save, .ldp-pub-go {
+  padding: 10px 24px; border-radius: var(--mb-radius-pill); cursor: pointer;
+  font: 600 13px var(--mb-font); line-height: 1; transition: filter .15s, background .15s;
+}
+.ldp-pub-save { border: 1.5px solid var(--mb-blue); background: #fff; color: var(--mb-blue); }
+.ldp-pub-save:hover { background: var(--mb-blue-50); }
+.ldp-pub-go {
+  border: none; background: var(--mb-gradient); color: #fff;
+  box-shadow: 0 6px 16px rgba(49,76,231,.25);
+}
+.ldp-pub-go:hover { filter: brightness(1.05); }
+@media (max-width: 720px) { .ldp-pub-grid { grid-template-columns: 1fr; } }
+
 /* Toolbar component (move/clone/delete) dùng màu MB */
 .gjs-toolbar { background: var(--mb-navy); border-radius: var(--mb-radius-pill); }
 .gjs-toolbar-item { color: #fff; }
